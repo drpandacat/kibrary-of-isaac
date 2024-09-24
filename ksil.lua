@@ -1,3 +1,20 @@
+--[[
+    Kerkel's Standard Isaac Library
+    not to be confused with
+    Thicco's Standard Isaac Library
+
+    Version 1.0
+
+    Collection of libraries, utility functions, enums, and other declarations I find useful to use across mods
+
+    GitHub repository: https://github.com/drpandacat/kibrary-of-isaac
+
+    Special thanks to:
+    Catinsurance
+    Sanio64
+    Thicco Catto
+]]
+
 ---@class ksil.Preferences
 ---@field JumpLib boolean?
 ---@field CustomStatusLib boolean?
@@ -9,14 +26,14 @@ return {SuperRegisterMod = function (self, mod, path, preferences)
     local AddCallback = mod.AddCallback
     local AddPriorityCallback = mod.AddPriorityCallback
 
-    ---@param id ModCallbacks | JumpCallback | string
+    ---@param id ModCallbacks | JumpCallback | CustomStatusCallback | SaveManager.Utility.CustomCallback | string
     ---@param fn function
     ---@param param any
     function mod:AddCallback(id, fn, param)
         AddCallback(mod, id, fn, param)
     end
 
-    ---@param id ModCallbacks | JumpCallback | string
+    ---@param id ModCallbacks | JumpCallback | CustomStatusCallback | SaveManager.Utility.CustomCallback | string
     ---@param priority CallbackPriority | integer
     ---@param fn function
     ---@param param any
@@ -24,13 +41,13 @@ return {SuperRegisterMod = function (self, mod, path, preferences)
         AddPriorityCallback(mod, id, priority, fn, param)
     end
 
-    ---@module "koi.savemanager"
-    mod.SaveManager = include(path .. ".savemanager")
+    ---@module "IsaacSaveManager.src.save_manager"
+    mod.SaveManager = include(path .. ".IsaacSaveManager.src.save_manager")
     mod.SaveManager.Init(mod)
 
     if not preferences or preferences.HiddenItemManager ~= false then
-        ---@module "koi.hiddenitemmanager"
-        mod.HiddenItemManager = require(path .. ".hiddenitemmanager")
+        ---@module "HiddenItemManager.hidden_item_manager"
+        mod.HiddenItemManager = require(path .. ".HiddenItemManager.hidden_item_manager")
         mod.HiddenItemManager:Init(mod)
 
         mod:AddCallback(mod.SaveManager.Utility.CustomCallback.POST_DATA_SAVE, function ()
@@ -43,14 +60,14 @@ return {SuperRegisterMod = function (self, mod, path, preferences)
     end
 
     if not preferences or preferences.JumpLib ~= false then
-        include(path .. ".jumplib").Init()
+        include(path .. ".JumpLib.jumplib").Init()
     end
 
     if not preferences or preferences.CustomStatusLib ~= false then
-        include(path .. ".customstatuslib").Init()
+        include(path .. ".CustomStatusLib.customstatuslib").Init()
     end
 
-    __TEMP_DATA = __TEMP_DATA or {}
+    __TEMP_DATA = __TEMP_DATA or {} -- TODO: replace
 
     mod:AddCallback(ModCallbacks.MC_PRE_GAME_EXIT, function ()
         __TEMP_DATA = {}
@@ -714,12 +731,3 @@ return {SuperRegisterMod = function (self, mod, path, preferences)
 
     return mod
 end}
-
---[[
-    Kerkel's Standard Isaac Library
-    not to be confused with
-    Thicco's Standard Isaac Library
-
-    Discord: @kerkelkerkel
-    GitHub: @drpandacat
-]]
