@@ -3,7 +3,7 @@
     not to be confused with
     Thicco's Standard Isaac Library
 
-    Version 1.0
+    Version 1.0.1
 
     Collection of libraries, utility functions, enums, and other declarations I find useful to use across mods
 
@@ -63,7 +63,7 @@ return {SuperRegisterMod = function (self, mod, path, preferences)
         include(path .. ".JumpLib.jumplib").Init()
     end
 
-    if not preferences or preferences.CustomStatusLib ~= false then
+    if REPENTOGON and (not preferences or preferences.CustomStatusLib ~= false) then
         include(path .. ".CustomStatusLib.customstatuslib").Init()
     end
 
@@ -100,7 +100,7 @@ return {SuperRegisterMod = function (self, mod, path, preferences)
     }
 
     mod.Color = {
-        DEFAULT = Color()
+        DEFAULT = Color(1, 1, 1, 1)
     }
 
     ---@param type EntityType | integer
@@ -246,15 +246,36 @@ return {SuperRegisterMod = function (self, mod, path, preferences)
         return flags & flag ~= 0
     end
 
-    ---@param player EntityPlayer
-    ---@param amt integer
-    ---@param type AddHealthType
-    mod:AddCallback(ModCallbacks.MC_POST_PLAYER_ADD_HEARTS, function (_, player, amt, type)
-        if amt <= 0 then return end
-        if mod:HasFlags(type, AddHealthType.RED | AddHealthType.ROTTEN) then
-            mod:GetData(player, "Bleeding").Bleeding = false
-        end
-    end)
+    if REPENTOGON then
+        ---@param player EntityPlayer
+        ---@param amt integer
+        ---@diagnostic disable-next-line: undefined-doc-name
+        ---@param type AddHealthType
+        ---@diagnostic disable-next-line: undefined-field
+        mod:AddCallback(ModCallbacks.MC_POST_PLAYER_ADD_HEARTS, function (_, player, amt, type)
+            if amt <= 0 then return end
+
+            local data = mod:GetData(player, "Bleeding") if not data.Bleeding then return end
+
+            ---@diagnostic disable-next-line: undefined-global, param-type-mismatch
+            if mod:HasFlags(type, AddHealthType.RED | AddHealthType.ROTTEN) then
+                data.Bleeding = false
+            end
+        end)
+    else
+        ---@param player EntityPlayer
+        mod:AddCallback(ModCallbacks.MC_POST_PEFFECT_UPDATE, function (_, player)
+            local data = mod:GetData(player, "Bleeding") if not data.Bleeding then return end
+            local hearts = player:GetHearts()
+            data.PrevHearts = data.PrevHearts or hearts
+
+            if hearts > data.PrevHearts then
+                data.Bleeding = false
+            end
+
+            data.PrevHearts = hearts
+        end)
+    end
 
     ---@param list Entity[]
     ---@param pos Vector
@@ -371,14 +392,16 @@ return {SuperRegisterMod = function (self, mod, path, preferences)
             if v.Identifier == config.Identifier then
                 insert.Amount = v.Amount + insert.Amount
                 save[i] = insert
-                player:AddCacheFlags(config.Stat, true)
+                player:AddCacheFlags(config.Stat)
+                player:EvaluateItems()
                 return
             end
         end
 
         table.insert(save, insert)
 
-        player:AddCacheFlags(config.Stat, true)
+        player:AddCacheFlags(config.Stat)
+        player:EvaluateItems()
     end
 
     ---@class ksil.TempStatEntry
