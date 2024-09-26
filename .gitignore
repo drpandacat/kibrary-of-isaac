@@ -3,3 +3,4 @@ disable.it
 settings.json
 .vscode
 metadata.xml
+main.lua

@@ -3,7 +3,7 @@
     not to be confused with
     Thicco's Standard Isaac Library
 
-    Version 1.0.1
+    Version 1.0.2
 
     Collection of libraries, utility functions, enums, and other declarations I find useful to use across mods
 
@@ -20,9 +20,12 @@
 ---@field CustomStatusLib boolean?
 ---@field HiddenItemManager boolean?
 
+---@param name string
 ---@param path string
 ---@param preferences ksil.Preferences?
-return {SuperRegisterMod = function (self, mod, path, preferences)
+return {SuperRegisterMod = function (self, name, path, preferences)
+    local mod = RegisterMod(name, 1)
+
     local AddCallback = mod.AddCallback
     local AddPriorityCallback = mod.AddPriorityCallback
 
