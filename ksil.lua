@@ -3,7 +3,7 @@
     not to be confused with
     Thicco's Standard Isaac Library
 
-    Version 1.0.2
+    Version 1.0b
 
     Collection of libraries, utility functions, enums, and other declarations I find useful to use across mods
 
@@ -13,6 +13,7 @@
     Catinsurance
     Sanio64
     Thicco Catto
+    Linedime
 ]]
 
 ---@class ksil.Preferences
@@ -20,10 +21,37 @@
 ---@field CustomStatusLib boolean?
 ---@field HiddenItemManager boolean?
 
+---@class ksil.TempStatConfig
+---@field Stat CacheFlag
+---@field Duration integer
+---@field Amount number
+---@field Persistent? boolean
+---@field Frequency? integer
+---@field Identifier string
+
+---@class ksil.TempStatEntry
+---@field Persistent boolean
+---@field Type ksil.TempStatType
+---@field Frequency integer
+---@field Amount number
+---@field ChangeAmount number
+---@field Stat CacheFlag
+---@field ApplyFrame integer
+---@field Identifier string
+
+---@class ksil.SchedulerEntry
+---@field Frame integer
+---@field Fn function
+---@field Delay integer
+---@field Temp boolean
+
 ---@param name string
 ---@param path string
 ---@param preferences ksil.Preferences?
 return {SuperRegisterMod = function (self, name, path, preferences)
+
+    --#region Init
+
     local mod = RegisterMod(name, 1)
 
     local AddCallback = mod.AddCallback
@@ -70,6 +98,259 @@ return {SuperRegisterMod = function (self, name, path, preferences)
         include(path .. ".CustomStatusLib.customstatuslib").Init()
     end
 
+    --#endregion
+
+    --#region Declarations
+
+    mod.TEAR_COPYING_FAMILIARS = (JumpLib and JumpLib.Internal.TEAR_COPYING_FAMILIARS) or {
+        [FamiliarVariant.INCUBUS] = true,
+        [FamiliarVariant.TWISTED_BABY] = true,
+        [FamiliarVariant.UMBILICAL_BABY] = true,
+        [FamiliarVariant.BLOOD_BABY] = true,
+    }
+
+    mod.CREEP = {
+        [EffectVariant.CREEP_RED] = true,
+        [EffectVariant.CREEP_GREEN] = true,
+        [EffectVariant.CREEP_YELLOW] = true,
+        [EffectVariant.CREEP_WHITE] = true,
+        [EffectVariant.CREEP_BLACK] = true,
+        [EffectVariant.PLAYER_CREEP_LEMON_MISHAP] = true,
+        [EffectVariant.PLAYER_CREEP_HOLYWATER] = true,
+        [EffectVariant.PLAYER_CREEP_WHITE] = true,
+        [EffectVariant.PLAYER_CREEP_BLACK] = true,
+        [EffectVariant.PLAYER_CREEP_RED] = true,
+        [EffectVariant.PLAYER_CREEP_GREEN] = true,
+        [EffectVariant.PLAYER_CREEP_HOLYWATER_TRAIL] = true,
+        [EffectVariant.CREEP_BROWN] = true,
+        [EffectVariant.PLAYER_CREEP_LEMON_PARTY] = true,
+        [EffectVariant.PLAYER_CREEP_PUDDLE_MILK] = true,
+        [EffectVariant.CREEP_SLIPPERY_BROWN] = true,
+        [EffectVariant.CREEP_SLIPPERY_BROWN_GROWING] = true,
+        [EffectVariant.CREEP_STATIC] = true,
+        [EffectVariant.CREEP_LIQUID_POOP] = true,
+    }
+
+    mod.ELLIPSE_CREEP = {
+        [EffectVariant.PLAYER_CREEP_HOLYWATER] = true,
+        [EffectVariant.PLAYER_CREEP_LEMON_MISHAP] = true,
+        [EffectVariant.PLAYER_CREEP_LEMON_PARTY] = true,
+        [EffectVariant.PLAYER_CREEP_PUDDLE_MILK] = true,
+    }
+
+    mod.Vector = {
+        ZERO = Vector(0, 0),
+        ONE = Vector(1, 1),
+    }
+
+    mod.Color = {
+        DEFAULT = Color(1, 1, 1, 1)
+    }
+
+    ---@enum ksil.DataPersistenceMode
+    mod.DataPersistenceMode = {
+        ROOM = 1,
+        RUN = 2,
+        FLOOR = 3,
+        ROOM_FLOOR = 4
+    }
+
+    ---@enum ksil.TempStatType
+    mod.TempStatType = {
+        INCREASE = 1,
+        DECREASE = 2,
+    }
+
+    ---@enum ksil.PlayerSearchType
+    mod.PlayerSearchType = {
+        PLAYER_ONLY = 1,
+        FAMILIAR_TEARCOPYING = 2,
+        ALL = 3
+    }
+
+    --#endregion
+
+    --#region Math
+    function mod:Lerp(a, b, t)
+        return a + (b - a) * t
+    end
+
+    function mod:ShortAngleDis(from, to)
+        local maxAngle = 360
+        local disAngle = (to - from) % maxAngle
+
+        return (2 * disAngle) % maxAngle - disAngle
+    end
+
+    function mod:LerpAngle(from, to, fraction)
+        return from + mod:ShortAngleDis(from, to) * fraction
+    end
+
+    ---@param maxFireDelay number
+    ---@return number
+    function mod:ToTearsPerSecond(maxFireDelay)
+        return 30 / (maxFireDelay + 1)
+    end
+
+    ---@param tearsPerSecond number
+    ---@return number
+    function mod:ToMaxFireDelay(tearsPerSecond)
+        return 30 / tearsPerSecond - 1
+    end
+
+    ---@param vector Vector
+    function mod:CardinalClamp(vector)
+        return Vector.FromAngle(((vector:GetAngleDegrees() + 45) // 90) * 90)
+    end
+
+    ---@param angleDegrees number
+    ---@return Direction
+    function mod:AngleToDirection(angleDegrees)
+        local positiveDegrees = angleDegrees
+
+        while positiveDegrees < 0 do
+            positiveDegrees = positiveDegrees + 360
+        end
+
+        local normalizedDegrees = positiveDegrees % 360
+
+        if normalizedDegrees < 45 then
+            return Direction.RIGHT
+        end
+
+        if normalizedDegrees < 135 then
+            return Direction.DOWN
+        end
+
+        if normalizedDegrees < 225 then
+            return Direction.LEFT
+        end
+
+        if normalizedDegrees < 315 then
+            return Direction.UP
+        end
+
+        return Direction.RIGHT
+    end
+
+    ---@param vector Vector
+    ---@return Direction
+    function mod:VectorToDirection(vector)
+        return mod:AngleToDirection(vector:GetAngleDegrees())
+    end
+
+    local DIRECTION_TO_VECTOR = {
+        [Direction.DOWN] = Vector(0, 1),
+        [Direction.LEFT] = Vector(-1, 0),
+        [Direction.UP] = Vector(0, -1),
+        [Direction.RIGHT] = Vector(1, 0),
+        [Direction.NO_DIRECTION] = Vector(0, 0)
+    }
+
+    ---@param direction Direction
+    ---@return Vector
+    function mod:DirectionToVector(direction)
+        return DIRECTION_TO_VECTOR[direction]
+    end
+
+    local DIRECTION_TO_ANGLE = {
+        [Direction.LEFT] = 180,
+        [Direction.UP] = -90,
+        [Direction.RIGHT] = 0,
+        [Direction.DOWN] = 90,
+        [Direction.NO_DIRECTION] = 0
+    }
+
+    ---@param direction Direction
+    ---@return number
+    function mod:DirectionToAngle(direction)
+        return DIRECTION_TO_ANGLE[direction]
+    end
+
+    function mod:Clamp(value, min, max)
+        if value < min then
+            return min
+        elseif value > max then
+            return max
+        end
+
+        return value
+    end
+
+    ---@param flags integer
+    ---@param flag integer
+    ---@return boolean
+    function mod:HasFlags(flags, flag)
+        return flags & flag ~= 0
+    end
+
+    --#endregion
+
+    --#region Tables
+
+    ---@param tbl table
+    ---@param value any
+    function mod:IsIn(tbl, value)
+        for _, v in pairs(tbl) do
+            if v == value then
+                return true
+            end
+        end
+        return false
+    end
+
+    ---@param tbl table
+    ---@param deeperCopy? boolean
+    ---@return table
+    function mod:DeepCopy(tbl, deeperCopy)
+        local copy = {}
+
+        for k, v in pairs(tbl) do
+            if deeperCopy and type(v) == "table" then
+                copy[k] = mod:DeepCopy(v, true)
+            else
+                copy[k] = v
+            end
+        end
+
+        return copy
+    end
+
+    --#endregion
+
+    --#region Vectors
+
+    local DIRECTION_TO_OFFSET = {
+        [Direction.UP] = Vector(0, 40),
+        [Direction.RIGHT] = Vector(-40, 0),
+        [Direction.DOWN] = Vector(0, -40),
+        [Direction.LEFT] = Vector(40, 0),
+    }
+
+    ---@param position Vector
+    ---@return boolean
+    function mod:IsPositionAccessible(position)
+        for slot = DoorSlot.LEFT0, DoorSlot.NUM_DOOR_SLOTS - 1 do
+            local door = Game():GetRoom():GetDoor(slot) if door then
+                local entity = mod:SpawnNPC(EntityType.ENTITY_SHOPKEEPER, 0, door.Position + DIRECTION_TO_OFFSET[door.Direction])
+                local pathFinder = entity.Pathfinder
+
+                entity.Visible = false
+                entity:Remove()
+
+                if pathFinder:HasPathToPos(position, true) then
+                    return true
+                end
+            end
+        end
+
+        return false
+    end
+
+    --#endregion
+
+    --#region Entity data
+
     __TEMP_DATA = __TEMP_DATA or {} -- TODO: replace
 
     mod:AddCallback(ModCallbacks.MC_PRE_GAME_EXIT, function ()
@@ -82,29 +363,41 @@ return {SuperRegisterMod = function (self, name, path, preferences)
         __TEMP_DATA[mod.Name][GetPtrHash(entity)] = nil
     end)
 
-    mod.TEAR_COPYING_FAMILIARS = (JumpLib and JumpLib.Internal.TEAR_COPYING_FAMILIARS) or {
-        [FamiliarVariant.INCUBUS] = true,
-        [FamiliarVariant.TWISTED_BABY] = true,
-        [FamiliarVariant.UMBILICAL_BABY] = true,
-        [FamiliarVariant.BLOOD_BABY] = true,
-    }
+    ---@param entity Entity
+    ---@param identifier string
+    ---@param persistenceMode? ksil.DataPersistenceMode
+    ---@return table
+    function mod:GetData(entity, identifier, persistenceMode)
+        if not persistenceMode then
+            local hash = GetPtrHash(entity)
+            __TEMP_DATA[self.Name] = __TEMP_DATA[self.Name] or {}
+            __TEMP_DATA[self.Name][hash] = __TEMP_DATA[self.Name][hash] or {}
+            __TEMP_DATA[self.Name][hash][identifier] = __TEMP_DATA[self.Name][hash][identifier] or {}
 
-    ---@enum DataPersistenceMode
-    mod.DataPersistenceMode = {
-        ROOM = 1,
-        RUN = 2,
-        FLOOR = 3,
-        ROOM_FLOOR = 4
-    }
+            return __TEMP_DATA[self.Name][hash][identifier]
+        else
+            local data
 
-    mod.Vector = {
-        ZERO = Vector(0, 0),
-        ONE = Vector(1, 1),
-    }
+            if persistenceMode == mod.DataPersistenceMode.ROOM then
+                data = mod.SaveManager.GetRoomSave(entity)
+            elseif persistenceMode == mod.DataPersistenceMode.FLOOR then
+                data = mod.SaveManager.GetFloorSave(entity)
+            elseif persistenceMode == mod.DataPersistenceMode.ROOM_FLOOR then
+                data = mod.SaveManager.GetRoomFloorSave(entity)
+            else
+                data = mod.SaveManager.GetRunSave(entity)
+            end
 
-    mod.Color = {
-        DEFAULT = Color(1, 1, 1, 1)
-    }
+            data[self.Name] = data[self.Name] or {}
+            data[self.Name][identifier] = data[self.Name][identifier] or {}
+
+            return data[self.Name][identifier]
+        end
+    end
+
+    --#endregion
+
+    --#region Entity spawning
 
     ---@param type EntityType | integer
     ---@param variant integer | integer
@@ -191,37 +484,45 @@ return {SuperRegisterMod = function (self, name, path, preferences)
         return Game():Spawn(EntityType.ENTITY_BOMB, variant, position, velocity or mod.Vector.ZERO, spawner or nil, subtype or 0, seed or math.max(Random(), 1)):ToBomb()
     end
 
-    ---@param entity Entity
-    ---@param identifier string
-    ---@param persistenceMode? DataPersistenceMode
-    ---@return table
-    function mod:GetData(entity, identifier, persistenceMode)
-        if not persistenceMode then
-            local hash = GetPtrHash(entity)
-            __TEMP_DATA[self.Name] = __TEMP_DATA[self.Name] or {}
-            __TEMP_DATA[self.Name][hash] = __TEMP_DATA[self.Name][hash] or {}
-            __TEMP_DATA[self.Name][hash][identifier] = __TEMP_DATA[self.Name][hash][identifier] or {}
-
-            return __TEMP_DATA[self.Name][hash][identifier]
-        else
-            local data
-
-            if persistenceMode == mod.DataPersistenceMode.ROOM then
-                data = mod.SaveManager.GetRoomSave(entity)
-            elseif persistenceMode == mod.DataPersistenceMode.FLOOR then
-                data = mod.SaveManager.GetFloorSave(entity)
-            elseif persistenceMode == mod.DataPersistenceMode.ROOM_FLOOR then
-                data = mod.SaveManager.GetRoomFloorSave(entity)
-            else
-                data = mod.SaveManager.GetRunSave(entity)
-            end
-
-            data[self.Name] = data[self.Name] or {}
-            data[self.Name][identifier] = data[self.Name][identifier] or {}
-
-            return data[self.Name][identifier]
-        end
+    ---@param variant integer
+    ---@param position Vector
+    ---@param velocity? Vector
+    ---@param subtype? integer
+    ---@param spawner? Entity
+    ---@param seed? integer
+    ---@return EntityKnife
+    function mod:SpawnKnife(variant, position, velocity, spawner, subtype, seed)
+        ---@diagnostic disable-next-line: return-type-mismatch
+        return Game():Spawn(EntityType.ENTITY_KNIFE, variant, position, velocity or mod.Vector.ZERO, spawner or nil, subtype or 0, seed or math.max(Random(), 1)):ToKnife()
     end
+
+    ---@param variant LaserVariant | integer
+    ---@param position Vector
+    ---@param velocity? Vector
+    ---@param subtype? integer
+    ---@param spawner? Entity
+    ---@param seed? integer
+    ---@return EntityLaser
+    function mod:SpawnLaser(variant, position, velocity, spawner, subtype, seed)
+        ---@diagnostic disable-next-line: return-type-mismatch
+        return Game():Spawn(EntityType.ENTITY_LASER, variant, position, velocity or mod.Vector.ZERO, spawner or nil, subtype or 0, seed or math.max(Random(), 1)):ToLaser()
+    end
+
+    ---@param variant integer
+    ---@param position Vector
+    ---@param velocity? Vector
+    ---@param subtype? integer
+    ---@param spawner? Entity
+    ---@param seed? integer
+    ---@return Entity
+    function mod:SpawnSlot(variant, position, velocity, spawner, subtype, seed)
+        ---@diagnostic disable-next-line: return-type-mismatch
+        return Game():Spawn(EntityType.ENTITY_SLOT, variant, position, velocity or mod.Vector.ZERO, spawner or nil, subtype or 0, seed or math.max(Random(), 1))
+    end
+
+    --#endregion
+
+    --#region Bleeding
 
     ---@param player EntityPlayer
     function mod:ApplyBleed(player)
@@ -234,6 +535,7 @@ return {SuperRegisterMod = function (self, name, path, preferences)
 
         if player:GetHearts() <= 1 then
             data.Bleeding = false
+
             return
         end
 
@@ -241,13 +543,6 @@ return {SuperRegisterMod = function (self, name, path, preferences)
             player:AddEntityFlags(EntityFlag.FLAG_BLEED_OUT)
         end
     end)
-
-    ---@param flags integer
-    ---@param flag integer
-    ---@return boolean
-    function mod:HasFlags(flags, flag)
-        return flags & flag ~= 0
-    end
 
     if REPENTOGON then
         ---@param player EntityPlayer
@@ -270,6 +565,7 @@ return {SuperRegisterMod = function (self, name, path, preferences)
         mod:AddCallback(ModCallbacks.MC_POST_PEFFECT_UPDATE, function (_, player)
             local data = mod:GetData(player, "Bleeding") if not data.Bleeding then return end
             local hearts = player:GetHearts()
+
             data.PrevHearts = data.PrevHearts or hearts
 
             if hearts > data.PrevHearts then
@@ -279,6 +575,10 @@ return {SuperRegisterMod = function (self, name, path, preferences)
             data.PrevHearts = hearts
         end)
     end
+
+    --#endregion
+
+    --#region Entity filtering
 
     ---@param list Entity[]
     ---@param pos Vector
@@ -295,6 +595,8 @@ return {SuperRegisterMod = function (self, name, path, preferences)
             end
         end
 
+        ---@param a Entity
+        ---@param b Entity
         table.sort(_list, function (a, b)
             return a.Position:Distance(pos) < b.Position:Distance(pos)
         end)
@@ -317,7 +619,11 @@ return {SuperRegisterMod = function (self, name, path, preferences)
         end
     end
 
-    local SCALES <const> = {0, 0.2, 0.45, 0.7, 0.9, 1, 1.3, 1.55, 1.8, 2, 2.2, 2.5, 2.8}
+    --#endregion
+
+    --#region Tears
+
+    local SCALES = {0, 0.2, 0.45, 0.7, 0.9, 1, 1.3, 1.55, 1.8, 2, 2.2, 2.5, 2.8}
 
     ---@param scale number
     ---@return string
@@ -335,51 +641,16 @@ return {SuperRegisterMod = function (self, name, path, preferences)
         return "RegularTear" .. size
     end
 
-    local DIRECTION_TO_OFFSET <const> = {
-        [Direction.UP] = Vector(0, 40),
-        [Direction.RIGHT] = Vector(-40, 0),
-        [Direction.DOWN] = Vector(0, -40),
-        [Direction.LEFT] = Vector(40, 0),
-    }
+    --#endregion
 
-    ---@param position Vector
-    ---@return boolean
-    function mod:IsPositionAccessible(position)
-        for slot = DoorSlot.LEFT0, DoorSlot.NUM_DOOR_SLOTS - 1 do
-            local door = Game():GetRoom():GetDoor(slot) if door then
-                local entity = mod:SpawnNPC(EntityType.ENTITY_SHOPKEEPER, 0, door.Position + DIRECTION_TO_OFFSET[door.Direction])
-                local pathFinder = entity.Pathfinder
-
-                entity.Visible = false
-                entity:Remove()
-
-                if pathFinder:HasPathToPos(position, true) then
-                    return true
-                end
-            end
-        end
-        return false
-    end
-
-    ---@enum TempStatType
-    mod.TempStatType = {
-        INCREASE = 1,
-        DECREASE = 2,
-    }
-
-    ---@class ksil.TempStatConfig
-    ---@field Stat CacheFlag
-    ---@field Duration integer
-    ---@field Amount number
-    ---@field Persistent? boolean
-    ---@field Frequency? integer
-    ---@field Identifier string
+    --#region Temporary stats
 
     ---@param player EntityPlayer
     ---@param config ksil.TempStatConfig
     function mod:AddTempStat(player, config)
         ---@type ksil.TempStatEntry[]
         local save = mod:GetData(player, "TempStats", mod.DataPersistenceMode.RUN)
+
         local insert = {
             Persistent = config.Persistent,
             Type = config.Amount < 0 and mod.TempStatType.INCREASE or mod.TempStatType.DECREASE,
@@ -407,16 +678,6 @@ return {SuperRegisterMod = function (self, name, path, preferences)
         player:EvaluateItems()
     end
 
-    ---@class ksil.TempStatEntry
-    ---@field Persistent boolean
-    ---@field Type TempStatType
-    ---@field Frequency integer
-    ---@field Amount number
-    ---@field ChangeAmount number
-    ---@field Stat CacheFlag
-    ---@field ApplyFrame integer
-    ---@field Identifier string
-
     ---@param player EntityPlayer
     mod:AddCallback(ModCallbacks.MC_POST_PEFFECT_UPDATE, function (_, player)
         ---@type ksil.TempStatEntry[]
@@ -430,11 +691,13 @@ return {SuperRegisterMod = function (self, name, path, preferences)
                     if (Game():GetFrameCount() - v.ApplyFrame) % v.Frequency == 0 then
                         if v.Type == mod.TempStatType.DECREASE then
                             v.Amount = v.Amount - v.ChangeAmount
+
                             if v.Amount <= 0 then
                                 table.remove(data, i)
                             end
                         else
                             v.Amount = v.Amount + v.ChangeAmount
+
                             if v.Amount >= 0 then
                                 table.remove(data, i)
                             end
@@ -472,18 +735,16 @@ return {SuperRegisterMod = function (self, name, path, preferences)
         end
     end)
 
-    ---@class ksil.SchedulerEntry
-    ---@field Frame integer
-    ---@field Fn function
-    ---@field Delay integer
-    ---@field Temp boolean
+    --#endregion
+
+    --#region Scheduler
 
     ---@type ksil.SchedulerEntry[]
     local schedulerEntries = {}
 
     ---@param fn function
     ---@param delay integer
-    ---@param temp boolean | nil
+    ---@param temp? boolean
     function mod:Schedule(fn, delay, temp)
         table.insert(schedulerEntries, {
             Frame = Game():GetFrameCount(),
@@ -516,106 +777,27 @@ return {SuperRegisterMod = function (self, name, path, preferences)
         end
     end)
 
-    function mod:Lerp(a, b, t)
-        return a + (b - a) * t
-    end
+    --#endregion
 
-    function mod:ShortAngleDis(from, to)
-        local maxAngle = 360
-        local disAngle = (to - from) % maxAngle
+    --#region RNG
 
-        return (2 * disAngle) % maxAngle - disAngle
-    end
-
-    function mod:LerpAngle(from, to, fraction)
-        return from + mod:ShortAngleDis(from, to) * fraction
-    end
-
-    ---@param maxFireDelay number
+    ---@param rng RNG
+    ---@param min number
+    ---@param max number
     ---@return number
-    function mod:ToTearsPerSecond(maxFireDelay)
-        return 30 / (maxFireDelay + 1)
+    function mod:RandomFloatRange(rng, min, max)
+        return min + rng:RandomFloat() * (max - min)
     end
 
-    ---@param tearsPerSecond number
-    ---@return number
-    function mod:ToMaxFireDelay(tearsPerSecond)
-        return 30 / tearsPerSecond - 1
-    end
+    --#endregion
 
-    ---@param vector Vector
-    function mod:CardinalClamp(vector)
-        return Vector.FromAngle(((vector:GetAngleDegrees() + 45) // 90) * 90)
-    end
-
-    ---@param angleDegrees number
-    ---@return Direction
-    function mod:AngleToDirection(angleDegrees)
-        local positiveDegrees = angleDegrees
-
-        while positiveDegrees < 0 do
-            positiveDegrees = positiveDegrees + 360
-        end
-
-        local normalizedDegrees = positiveDegrees % 360
-
-        if normalizedDegrees < 45 then
-            return Direction.RIGHT
-        end
-
-        if normalizedDegrees < 135 then
-            return Direction.DOWN
-        end
-
-        if normalizedDegrees < 225 then
-            return Direction.LEFT
-        end
-
-        if normalizedDegrees < 315 then
-            return Direction.UP
-        end
-
-        return Direction.RIGHT
-    end
-
-    ---@param vector Vector
-    ---@return Direction
-    function mod:VectorToDirection(vector)
-        return mod:AngleToDirection(vector:GetAngleDegrees())
-    end
-
-    local DIRECTION_TO_VECTOR <const> = {
-        [Direction.DOWN] = Vector(0, 1),
-        [Direction.LEFT] = Vector(-1, 0),
-        [Direction.UP] = Vector(0, -1),
-        [Direction.RIGHT] = Vector(1, 0),
-        [Direction.NO_DIRECTION] = Vector(0, 0)
-    }
-
-    ---@param direction Direction
-    ---@return Vector
-    function mod:DirectionToVector(direction)
-        return DIRECTION_TO_VECTOR[direction]
-    end
-
-    local DIRECTION_TO_ANGLE <const> = {
-        [Direction.LEFT] = 180,
-        [Direction.UP] = -90,
-        [Direction.RIGHT] = 0,
-        [Direction.DOWN] = 90,
-        [Direction.NO_DIRECTION] = 0
-    }
-
-    ---@param direction Direction
-    ---@return number
-    function mod:DirectionToAngle(direction)
-        return DIRECTION_TO_ANGLE[direction]
-    end
+    --#region Aiming
 
     ---@param player EntityPlayer
     ---@param disableClamp? boolean
     function mod:GetAimVect(player, disableClamp)
         local returnVect
+
         if player.ControllerIndex == 0 then
             if Input.IsMouseBtnPressed(MouseButton.LEFT) then
                 returnVect = (Input.GetMousePosition(true) - player.Position):Normalized()
@@ -649,15 +831,12 @@ return {SuperRegisterMod = function (self, name, path, preferences)
         end
     end
 
-    ---@enum PlayerSearchType
-    mod.PlayerSearchType = {
-        PLAYER_ONLY = 1,
-        FAMILIAR_TEARCOPYING = 2,
-        ALL = 3
-    }
+    --#endregion
+
+    --#region Players
 
     ---@param entity Entity
-    ---@param searchType PlayerSearchType
+    ---@param searchType ksil.PlayerSearchType
     ---@return EntityPlayer?
     function mod:GetPlayerFromEntity(entity, searchType)
         local player = (entity.SpawnerEntity and entity.SpawnerEntity:ToPlayer()) or (entity.Parent and entity.Parent:ToPlayer())
@@ -697,30 +876,12 @@ return {SuperRegisterMod = function (self, name, path, preferences)
         player:SetMinDamageCooldown((player:GetTrinketMultiplier(TrinketType.TRINKET_BLIND_RAGE) + 1) * 30)
     end
 
-    ---@param tbl table
-    ---@param value any
-    function mod:IsIn(tbl, value)
-        for _, v in pairs(tbl) do
-            if v == value then
-                return true
-            end
-        end
-        return false
-    end
-
-    ---@param rng RNG
-    ---@param min number
-    ---@param max number
-    ---@return number
-    function mod:RandomFloatRange(rng, min, max)
-        return min + rng:RandomFloat() * (max - min)
-    end
-
     ---@param player EntityPlayer
     ---@param enable boolean
     ---@param identifier string
     function mod:SetBloodTears(player, enable, identifier)
         local data = mod:GetData(player, "BloodTears")
+
         data[identifier] = data[identifier] or {}
         data[identifier] = enable
     end
@@ -736,7 +897,7 @@ return {SuperRegisterMod = function (self, name, path, preferences)
         return false
     end
 
-    local TEAR_TO_BLOOD <const> = {
+    local TEAR_TO_BLOOD = {
         [TearVariant.BLUE] = TearVariant.BLOOD,
         [TearVariant.CUPID_BLUE] = TearVariant.CUPID_BLOOD,
         [TearVariant.PUPULA] = TearVariant.PUPULA_BLOOD,
@@ -750,10 +911,93 @@ return {SuperRegisterMod = function (self, name, path, preferences)
     ---@param tear EntityTear
     mod:AddCallback(ModCallbacks.MC_POST_FIRE_TEAR, function (_, tear)
         local player = mod:GetPlayerFromEntity(tear, mod.PlayerSearchType.FAMILIAR_TEARCOPYING) if not player or not mod:HasBloodTears(player) then return end
+
         if TEAR_TO_BLOOD[tear.Variant] then
             tear:ChangeVariant(TEAR_TO_BLOOD[tear.Variant])
         end
     end)
+
+    --#endregion
+
+    --#region Familiars
+
+    ---@param familiar Entity?
+    ---@return number
+    function mod:GetFamiliarDamageMult(familiar)
+        familiar = familiar and familiar:ToFamiliar() if not familiar then
+            return 1
+        end
+
+        if familiar.Player:GetPlayerType() == PlayerType.PLAYER_LILITH then
+            if familiar.Variant == FamiliarVariant.TWISTED_BABY then
+                return 0.5
+            end
+        else
+            if familiar.Variant == FamiliarVariant.INCUBUS or familiar.Variant == FamiliarVariant.UMBILICAL_BABY then
+                return 0.75
+            elseif familiar.Variant == FamiliarVariant.TWISTED_BABY then
+                return 0.375
+            end
+        end
+
+        if familiar.Variant == FamiliarVariant.BLOOD_BABY then
+            if familiar.SubType == 2 then
+                return 0.43
+            elseif familiar.SubType == 3 then
+                return 0.52
+            end
+
+            return 0.35
+        end
+
+        return 1
+    end
+
+    --#endregion
+
+    --#region Creep
+
+    ---@param pos Vector
+    ---@return Entity?
+    local function GetNearestCreep(pos)
+        ---@param entity Entity
+        return mod:EntitiesByDistance(Isaac.FindByType(EntityType.ENTITY_EFFECT), pos, function (entity)
+            return mod.CREEP[entity.Variant]
+        end)[1]
+    end
+
+    ---@param entity Entity
+    ---@param creep? Entity
+    ---@param slack? integer
+    ---@return boolean
+    local function IsInEllipseCreep(entity, creep, slack)
+        creep = creep or GetNearestCreep(entity.Position) if not creep then return false end
+        local size = creep.Size * (slack or 1)
+        local dif = entity.Position - creep.Position
+
+        return (dif.X / (size * creep.SpriteScale.X)) ^ 2 + (dif.Y / (size * creep.SpriteScale.Y / 1.5)) ^ 2 <= 1
+    end
+
+    ---@param entity Entity
+    ---@param creep? Entity
+    ---@param slack? integer
+    ---@return boolean
+    function mod:IsInCreep(entity, creep, slack)
+        creep = creep or GetNearestCreep(entity.Position) if not creep then return false end
+
+        if creep:ToEffect().Timeout < 1 then
+            return false
+        end
+
+        if mod.ELLIPSE_CREEP[creep.Variant] then
+
+            return IsInEllipseCreep(entity, creep, slack)
+        end
+
+        return entity.Position:Distance(creep.Position) <= (creep.Size * (slack or 1))
+    end
+
+    --#endregion
 
     return mod
 end}
