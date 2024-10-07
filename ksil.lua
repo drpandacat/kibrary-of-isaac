@@ -3,7 +3,7 @@
     not to be confused with
     Thicco's Standard Isaac Library
 
-    Version 1.0b
+    Version 1.0.1
 
     Collection of libraries, utility functions, enums, and other declarations I find useful to use across mods
 
@@ -43,7 +43,7 @@
 ---@field Frame integer
 ---@field Fn function
 ---@field Delay integer
----@field Temp boolean
+---@field Type ksil.FunctionScheduleType
 
 ---@param name string
 ---@param path string
@@ -102,6 +102,7 @@ return {SuperRegisterMod = function (self, name, path, preferences)
 
     --#region Declarations
 
+    ---@type {[FamiliarVariant]: true}
     mod.TEAR_COPYING_FAMILIARS = (JumpLib and JumpLib.Internal.TEAR_COPYING_FAMILIARS) or {
         [FamiliarVariant.INCUBUS] = true,
         [FamiliarVariant.TWISTED_BABY] = true,
@@ -109,6 +110,9 @@ return {SuperRegisterMod = function (self, name, path, preferences)
         [FamiliarVariant.BLOOD_BABY] = true,
     }
 
+    mod.TEAR_COPYING_FAMILIARS[FamiliarVariant.SPRINKLER] = true
+
+    ---@type {[EffectVariant]: true}
     mod.CREEP = {
         [EffectVariant.CREEP_RED] = true,
         [EffectVariant.CREEP_GREEN] = true,
@@ -131,6 +135,7 @@ return {SuperRegisterMod = function (self, name, path, preferences)
         [EffectVariant.CREEP_LIQUID_POOP] = true,
     }
 
+    ---@type {[EffectVariant]: true}
     mod.ELLIPSE_CREEP = {
         [EffectVariant.PLAYER_CREEP_HOLYWATER] = true,
         [EffectVariant.PLAYER_CREEP_LEMON_MISHAP] = true,
@@ -138,11 +143,13 @@ return {SuperRegisterMod = function (self, name, path, preferences)
         [EffectVariant.PLAYER_CREEP_PUDDLE_MILK] = true,
     }
 
+    ---@type {[string]: Vector}
     mod.Vector = {
         ZERO = Vector(0, 0),
         ONE = Vector(1, 1),
     }
 
+    ---@type {[string]: Color}
     mod.Color = {
         DEFAULT = Color(1, 1, 1, 1)
     }
@@ -168,20 +175,77 @@ return {SuperRegisterMod = function (self, name, path, preferences)
         ALL = 3
     }
 
+    ---@enum ksil.FunctionScheduleType
+    mod.FunctionScheduleType = {
+        PERSISTENT = 1,
+        LEAVE_ROOM_CANCEL = 2,
+        POST_LEAVE_ROOM_EXECUTE = 3,
+        ---Treated as `POST_LEAVE_ROOM_EXECUTE` if REPENTOGON is not active
+        PRE_LEAVE_ROOM_EXECUTE = 4,
+    }
+
+    ---@enum ksil.BloodBabySubType
+    mod.BloodBabySubType = {
+        RED = 0,
+        SOUL = 1,
+        BLACK = 2,
+        ETERNAL = 3,
+        GOLD = 4,
+        BONE = 5,
+        ROTTEN = 6,
+        TRINKET = 7,
+    }
+
+    ---@type {[FamiliarVariant]: true}
+    mod.HIVE_MIND_FAMILIARS = {
+        [FamiliarVariant.FOREVER_ALONE] = true,
+        [FamiliarVariant.DISTANT_ADMIRATION] = true,
+        [FamiliarVariant.FLY_ORBITAL] = true,
+        [FamiliarVariant.BLUE_FLY] = true,
+        [FamiliarVariant.BBF] = true,
+        [FamiliarVariant.BEST_BUD] = true,
+        [FamiliarVariant.BIG_FAN] = true,
+        [FamiliarVariant.SISSY_LONGLEGS] = true,
+        [FamiliarVariant.BLUE_SPIDER] = true,
+        -- [FamiliarVariant.BLUEBABYS_ONLY_FRIEND] = true,
+        [FamiliarVariant.SWORN_PROTECTOR] = true,
+        [FamiliarVariant.FRIEND_ZONE] = true,
+        [FamiliarVariant.LOST_FLY] = true,
+        [FamiliarVariant.SPIDER_MOD] = true,
+        [FamiliarVariant.OBSESSED_FAN] = true,
+        [FamiliarVariant.PAPA_FLY] = true,
+        [FamiliarVariant.SPIDER_BABY] = true,
+        [FamiliarVariant.BROWN_NUGGET_POOTER] = true,
+        [FamiliarVariant.ANGRY_FLY] = true,
+        [FamiliarVariant.INTRUDER] = true,
+        [FamiliarVariant.PSY_FLY] = true,
+        [FamiliarVariant.BOT_FLY] = true,
+        [FamiliarVariant.BABY_PLUM] = true,
+        [FamiliarVariant.FRUITY_PLUM] = true,
+        [FamiliarVariant.SWARM_FLY_ORBITAL] = true,
+        [FamiliarVariant.ABYSS_LOCUST] = true,
+    }
+
     --#endregion
 
     --#region Math
+
     function mod:Lerp(a, b, t)
         return a + (b - a) * t
     end
 
+    ---@param from number
+    ---@param to number
+    ---@return number
     function mod:ShortAngleDis(from, to)
-        local maxAngle = 360
-        local disAngle = (to - from) % maxAngle
-
-        return (2 * disAngle) % maxAngle - disAngle
+        local disAngle = (to - from) % 360
+        return 2 * disAngle % 360 - disAngle
     end
 
+    ---@param from number
+    ---@param to number
+    ---@param fraction number
+    ---@return number
     function mod:LerpAngle(from, to, fraction)
         return from + mod:ShortAngleDis(from, to) * fraction
     end
@@ -203,34 +267,19 @@ return {SuperRegisterMod = function (self, name, path, preferences)
         return Vector.FromAngle(((vector:GetAngleDegrees() + 45) // 90) * 90)
     end
 
-    ---@param angleDegrees number
+    local ANGLE_TO_DIRECTION = {
+        Direction.RIGHT,
+        Direction.DOWN,
+        Direction.LEFT,
+        Direction.UP
+    }
+
+    ---@param angle number
     ---@return Direction
-    function mod:AngleToDirection(angleDegrees)
-        local positiveDegrees = angleDegrees
+    function mod:AngleToDirection(angle)
+        local normalizedDegrees = angle % 360
 
-        while positiveDegrees < 0 do
-            positiveDegrees = positiveDegrees + 360
-        end
-
-        local normalizedDegrees = positiveDegrees % 360
-
-        if normalizedDegrees < 45 then
-            return Direction.RIGHT
-        end
-
-        if normalizedDegrees < 135 then
-            return Direction.DOWN
-        end
-
-        if normalizedDegrees < 225 then
-            return Direction.LEFT
-        end
-
-        if normalizedDegrees < 315 then
-            return Direction.UP
-        end
-
-        return Direction.RIGHT
+        return ANGLE_TO_DIRECTION[math.floor((normalizedDegrees + 45) / 90) % 4]
     end
 
     ---@param vector Vector
@@ -268,13 +317,7 @@ return {SuperRegisterMod = function (self, name, path, preferences)
     end
 
     function mod:Clamp(value, min, max)
-        if value < min then
-            return min
-        elseif value > max then
-            return max
-        end
-
-        return value
+        return math.max(min, math.min(max, value))
     end
 
     ---@param flags integer
@@ -306,11 +349,7 @@ return {SuperRegisterMod = function (self, name, path, preferences)
         local copy = {}
 
         for k, v in pairs(tbl) do
-            if deeperCopy and type(v) == "table" then
-                copy[k] = mod:DeepCopy(v, true)
-            else
-                copy[k] = v
-            end
+            copy[k] = deeperCopy and type(v) == "table" and mod:DeepCopy(v, true) or v
         end
 
         return copy
@@ -332,11 +371,11 @@ return {SuperRegisterMod = function (self, name, path, preferences)
     function mod:IsPositionAccessible(position)
         for slot = DoorSlot.LEFT0, DoorSlot.NUM_DOOR_SLOTS - 1 do
             local door = Game():GetRoom():GetDoor(slot) if door then
-                local entity = mod:SpawnNPC(EntityType.ENTITY_SHOPKEEPER, 0, door.Position + DIRECTION_TO_OFFSET[door.Direction])
-                local pathFinder = entity.Pathfinder
+                local npc = mod:SpawnNPC(EntityType.ENTITY_SHOPKEEPER, 0, door.Position + DIRECTION_TO_OFFSET[door.Direction])
+                local pathFinder = npc.Pathfinder
 
-                entity.Visible = false
-                entity:Remove()
+                npc.Visible = false
+                npc:Remove()
 
                 if pathFinder:HasPathToPos(position, true) then
                     return true
@@ -514,10 +553,17 @@ return {SuperRegisterMod = function (self, name, path, preferences)
     ---@param subtype? integer
     ---@param spawner? Entity
     ---@param seed? integer
-    ---@return Entity
+    ---@return Entity | EntitySlot
     function mod:SpawnSlot(variant, position, velocity, spawner, subtype, seed)
         ---@diagnostic disable-next-line: return-type-mismatch
-        return Game():Spawn(EntityType.ENTITY_SLOT, variant, position, velocity or mod.Vector.ZERO, spawner or nil, subtype or 0, seed or math.max(Random(), 1))
+        local entity = Game():Spawn(EntityType.ENTITY_SLOT, variant, position, velocity or mod.Vector.ZERO, spawner or nil, subtype or 0, seed or math.max(Random(), 1))
+
+        if REPENTOGON then
+            ---@diagnostic disable-next-line: return-type-mismatch
+            return entity:ToSlot()
+        end
+
+        return entity
     end
 
     --#endregion
@@ -535,7 +581,6 @@ return {SuperRegisterMod = function (self, name, path, preferences)
 
         if player:GetHearts() <= 1 then
             data.Bleeding = false
-
             return
         end
 
@@ -744,13 +789,13 @@ return {SuperRegisterMod = function (self, name, path, preferences)
 
     ---@param fn function
     ---@param delay integer
-    ---@param temp? boolean
-    function mod:Schedule(fn, delay, temp)
+    ---@param type ksil.FunctionScheduleType
+    function mod:Schedule(fn, delay, type)
         table.insert(schedulerEntries, {
             Frame = Game():GetFrameCount(),
             Fn = fn,
             Delay = delay,
-            Temp = temp
+            Type = type
         })
     end
 
@@ -758,9 +803,22 @@ return {SuperRegisterMod = function (self, name, path, preferences)
         schedulerEntries = {}
     end)
 
+    if REPENTOGON then
+        mod:AddCallback(ModCallbacks.MC_PRE_NEW_ROOM, function ()
+            for _, v in pairs(schedulerEntries) do
+                if v.Type == mod.FunctionScheduleType.PRE_LEAVE_ROOM_EXECUTE then
+                    v.Fn()
+                end
+            end
+        end)
+    end
+
     mod:AddCallback(ModCallbacks.MC_POST_NEW_ROOM, function ()
         for i, v in pairs(schedulerEntries) do
-            if v.Temp then
+            if v.Type ~= mod.FunctionScheduleType.PERSISTENT then
+                if v.Type == mod.FunctionScheduleType.POST_LEAVE_ROOM_EXECUTE or (not REPENTOGON and (v.Type == mod.FunctionScheduleType.PRE_LEAVE_ROOM_EXECUTE)) then
+                    v.Fn()
+                end
                 table.remove(schedulerEntries, i)
             end
         end
@@ -795,6 +853,7 @@ return {SuperRegisterMod = function (self, name, path, preferences)
 
     ---@param player EntityPlayer
     ---@param disableClamp? boolean
+    ---@return Vector
     function mod:GetAimVect(player, disableClamp)
         local returnVect
 
@@ -818,11 +877,13 @@ return {SuperRegisterMod = function (self, name, path, preferences)
     end
 
     ---@param player EntityPlayer
+    ---@return boolean
     function mod:IsShooting(player)
         return mod:GetAimVect(player):Length() > 0.001
     end
 
     ---@param player EntityPlayer
+    ---@return Direction
     function mod:GetAimDir(player)
         if mod:IsShooting(player) then
             return mod:VectorToDirection(mod:GetAimVect(player))
@@ -830,6 +891,30 @@ return {SuperRegisterMod = function (self, name, path, preferences)
             return Direction.NO_DIRECTION
         end
     end
+
+    ---@param player EntityPlayer
+    ---@return Direction
+    function mod:GetLastAimDir(player)
+        return mod:GetData(player, "Aiming").LastDirection or Direction.NO_DIRECTION
+    end
+
+    ---@param player EntityPlayer
+    ---@param disableClamp? boolean
+    ---@return Vector
+    function mod:GetLastAimVect(player, disableClamp)
+        local vect = mod:GetData(player, "Aiming").LastVector
+        return (not vect and mod.Vector.Zero) or (not disableClamp and mod:CardinalClamp(vect)) or vect
+    end
+
+    ---@param player EntityPlayer
+    mod:AddCallback(ModCallbacks.MC_POST_PLAYER_UPDATE, function (_, player)
+        if not mod:IsShooting(player) then return end
+
+        local data = mod:GetData(player, "Aiming")
+
+        data.LastDirection = mod:GetAimDir(player)
+        data.LastVector = mod:GetAimVect(player, true)
+    end)
 
     --#endregion
 
@@ -873,17 +958,14 @@ return {SuperRegisterMod = function (self, name, path, preferences)
 
     ---@param player EntityPlayer
     function mod:PlayerDamageCooldown(player)
-        player:SetMinDamageCooldown((player:GetTrinketMultiplier(TrinketType.TRINKET_BLIND_RAGE) + 1) * 30)
+        player:SetMinDamageCooldown((player:GetTrinketMultiplier(TrinketType.TRINKET_BLIND_RAGE) + 1) * 60)
     end
 
     ---@param player EntityPlayer
     ---@param enable boolean
     ---@param identifier string
     function mod:SetBloodTears(player, enable, identifier)
-        local data = mod:GetData(player, "BloodTears")
-
-        data[identifier] = data[identifier] or {}
-        data[identifier] = enable
+        mod:GetData(player, "BloodTears")[identifier] = enable
     end
 
     ---@param player EntityPlayer
@@ -928,29 +1010,51 @@ return {SuperRegisterMod = function (self, name, path, preferences)
             return 1
         end
 
-        if familiar.Player:GetPlayerType() == PlayerType.PLAYER_LILITH then
+        local mult
+        local playerType = familiar.Player:GetPlayerType()
+
+        if playerType == PlayerType.PLAYER_LILITH or playerType == PlayerType.PLAYER_LILITH_B then
             if familiar.Variant == FamiliarVariant.TWISTED_BABY then
-                return 0.5
+                mult = 0.5
             end
         else
             if familiar.Variant == FamiliarVariant.INCUBUS or familiar.Variant == FamiliarVariant.UMBILICAL_BABY then
-                return 0.75
+                mult = 0.75
             elseif familiar.Variant == FamiliarVariant.TWISTED_BABY then
-                return 0.375
+                mult = 0.375
             end
         end
 
-        if familiar.Variant == FamiliarVariant.BLOOD_BABY then
-            if familiar.SubType == 2 then
-                return 0.43
-            elseif familiar.SubType == 3 then
-                return 0.52
+        if not mult then
+            if familiar.Variant == FamiliarVariant.BLOOD_BABY then
+                if familiar.SubType == mod.BloodBabySubType.BLACK then
+                    mult = 0.4375
+                elseif familiar.SubType == mod.BloodBabySubType.ETERNAL then
+                    mult = 0.525
+                else
+                    mult = 0.35
+                end
             end
-
-            return 0.35
         end
 
-        return 1
+        if not mult then
+            mult = 1
+        end
+
+        if REPENTOGON then
+            ---@diagnostic disable-next-line: undefined-field
+            mult = mult * familiar:GetMultiplier()
+        else
+            local extraMult = (mod.HIVE_MIND_FAMILIARS[familiar.Variant] and familiar.Player:HasCollectible(CollectibleType.COLLECTIBLE_HIVE_MIND)) or familiar.Player:HasCollectible(CollectibleType.COLLECTIBLE_BFFS)
+
+            if extraMult then
+                return mult * 2
+            end
+
+            return mult
+        end
+
+        return mult
     end
 
     --#endregion
