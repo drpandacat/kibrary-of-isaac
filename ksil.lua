@@ -3,7 +3,7 @@
     Not to be confused with
     Thicco's Standard Isaac Library
 
-    Version 1.1
+    Version 1.1.0.1
 
     Collection of libraries, utility functions, enums, and other declarations I find useful to use across mods
 
@@ -62,7 +62,7 @@ return {SuperRegisterMod = function (self, name, path, preferences)
 
     local mod = RegisterMod(name, 1)
 
-    mod.KSIL_VERSION = 0
+    mod.KSIL_VERSION = 1
 
     local AddCallback = mod.AddCallback
     local AddPriorityCallback = mod.AddPriorityCallback
@@ -313,7 +313,7 @@ return {SuperRegisterMod = function (self, name, path, preferences)
     ---@param angle number
     ---@return Direction
     function mod:AngleToDirection(angle)
-        return ANGLE_TO_DIRECTION[math.floor((angle % 360 + 45) / 90) % 4]
+        return ANGLE_TO_DIRECTION[math.floor((angle % 360 + 45) / 90) % 4 + 1]
     end
 
     ---@param vector Vector
