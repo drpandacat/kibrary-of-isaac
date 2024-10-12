@@ -3,7 +3,7 @@
     Not to be confused with
     Thicco's Standard Isaac Library
 
-    Version 1.1.0.1
+    Version 1.1.0.2
 
     Collection of libraries, utility functions, enums, and other declarations I find useful to use across mods
 
@@ -62,7 +62,7 @@ return {SuperRegisterMod = function (self, name, path, preferences)
 
     local mod = RegisterMod(name, 1)
 
-    mod.KSIL_VERSION = 1
+    mod.KSIL_VERSION = 2
 
     local AddCallback = mod.AddCallback
     local AddPriorityCallback = mod.AddPriorityCallback
@@ -123,7 +123,7 @@ return {SuperRegisterMod = function (self, name, path, preferences)
         [FamiliarVariant.BLOOD_BABY] = true,
     }
 
-    mod.TEAR_COPYING_FAMILIARS[FamiliarVariant.SPRINKLER] = true
+    -- mod.TEAR_COPYING_FAMILIARS[FamiliarVariant.SPRINKLER] = true
 
     ---@type {[EffectVariant]: true}
     mod.CREEP = {
@@ -319,6 +319,10 @@ return {SuperRegisterMod = function (self, name, path, preferences)
     ---@param vector Vector
     ---@return Direction
     function mod:VectorToDirection(vector)
+        if vector:Length() < 0.001 then
+            return Direction.NO_DIRECTION
+        end
+
         return mod:AngleToDirection(vector:GetAngleDegrees())
     end
 
@@ -1586,7 +1590,7 @@ return {SuperRegisterMod = function (self, name, path, preferences)
                 mod:HideItem(player, true)
             end
 
-            if REPENTOGON then
+            if REPENTOGON and data.HeldConfig then
                 local state = player:GetItemState()
 
                 if (data.HeldConfig.Type == mod.ThrowableItemType.ACTIVE and state ~= data.HeldConfig.ID)
