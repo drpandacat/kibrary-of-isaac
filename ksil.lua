@@ -3,7 +3,7 @@
     Not to be confused with
     Thicco's Standard Isaac Library
 
-    Version 1.1.0.2
+    Version 1.1.1
 
     Collection of libraries, utility functions, enums, and other declarations I find useful to use across mods
 
@@ -53,6 +53,20 @@
 ---@field ThrowFn? fun(player: EntityPlayer, vect: Vector)
 ---@field Flags? integer
 
+---@class ksil.FloatingTextConfig
+---@field WiggleSpeed? integer
+---@field WiggleSize? integer
+---@field Text string
+---@field Position Vector
+---@field Font? Font
+---@field Color? KColor
+---@field FloatSpeed? integer
+---@field FadeSpeed? integer
+---@field FadeWait? integer
+---@field FrameCount? integer
+---@field Scale? integer
+---@field PauseOnPause? boolean
+
 ---@param name string
 ---@param path string
 ---@param preferences ksil.Preferences?
@@ -62,7 +76,7 @@ return {SuperRegisterMod = function (self, name, path, preferences)
 
     local mod = RegisterMod(name, 1)
 
-    mod.KSIL_VERSION = 2
+    mod.KSIL_VERSION = 3
 
     local AddCallback = mod.AddCallback
     local AddPriorityCallback = mod.AddPriorityCallback
@@ -1432,13 +1446,15 @@ return {SuperRegisterMod = function (self, name, path, preferences)
                 CardBehavior()
             end
         elseif not throw then
-            if data.HeldConfig.HideFn and data.HeldConfig.HideFn(player) then
-                if mod:HasFlags(data.HeldConfig.Flags, mod.ThrowableItemFlag.DISCHARGE_HIDE) then
-                    if active then
-                        player:DischargeActiveItem(data.ActiveSlot)
-                    else
-                        CardBehavior()
-                    end
+            if data.HeldConfig.HideFn then
+                data.HeldConfig.HideFn(player)
+            end
+
+            if mod:HasFlags(data.HeldConfig.Flags, mod.ThrowableItemFlag.DISCHARGE_HIDE) then
+                if active then
+                    player:DischargeActiveItem(data.ActiveSlot)
+                else
+                    CardBehavior()
                 end
             end
         end
@@ -1589,16 +1605,60 @@ return {SuperRegisterMod = function (self, name, path, preferences)
 
                 mod:HideItem(player, true)
             end
+        end
+    end)
 
-            if REPENTOGON and data.HeldConfig then
-                local state = player:GetItemState()
+    --#endregion
 
-                if (data.HeldConfig.Type == mod.ThrowableItemType.ACTIVE and state ~= data.HeldConfig.ID)
-                or (data.HeldConfig.Type == mod.ThrowableItemType.CARD and state ~= CollectibleType.COLLECTIBLE_NULL) then
-                    data.HeldConfig = nil
-                    data.ActiveSlot = nil
-                    data.Mimic = nil
+    --#region Floating text
+
+    ---@type ksil.FloatingTextConfig[]
+    local floatingText = {}
+
+    mod:AddCallback(ModCallbacks.MC_POST_NEW_ROOM, function ()
+        floatingText = {}
+    end)
+
+    ---@param config ksil.FloatingTextConfig
+    function mod:CreateFloatingText(config)
+        if not config.Font then
+            local font = Font()
+            font:Load("font/pftempestasevencondensed.fnt")
+            config.Font = font
+        end
+
+        config.Color = config.Color or KColor(1, 1, 1, 1)
+        config.FrameCount = config.FrameCount or 0
+        config.Scale = config.Scale or 1
+        config.WiggleSize = config.WiggleSize or 0.5
+        config.WiggleSpeed = config.WiggleSpeed or 0.1
+        config.FadeSpeed = config.FadeSpeed or 0.025
+        config.FadeWait = config.FadeWait or 60
+        config.FloatSpeed = config.FloatSpeed or 1
+
+        if config.PauseOnPause == nil then
+            config.PauseOnPause = true
+        end
+
+        table.insert(floatingText, config)
+    end
+
+    mod:AddCallback(ModCallbacks.MC_POST_RENDER, function ()
+        for i, config in pairs(floatingText) do
+            if config.Color.Alpha <= 0 then
+                table.remove(floatingText, i)
+            else
+                if not (config.PauseOnPause and Game():IsPaused()) then
+                    config.Position.X = config.Position.X + math.sin(config.FrameCount * config.WiggleSpeed) * config.WiggleSize
+                    config.Position.Y = config.Position.Y - config.FloatSpeed
+                    config.FrameCount = config.FrameCount + 1
+
+                    if config.FrameCount > config.FadeWait then
+                        config.Color.Alpha = config.Color.Alpha - config.FadeSpeed
+                    end
                 end
+
+                config.Font:DrawStringScaled(config.Text, config.Position.X, config.Position.Y, config.Scale, config.Scale, config.Color, 1, true)
             end
         end
     end)
