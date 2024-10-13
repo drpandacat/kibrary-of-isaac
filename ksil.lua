@@ -3,7 +3,7 @@
     Not to be confused with
     Thicco's Standard Isaac Library
 
-    Version 1.1.1
+    Version 1.1.1.1
 
     Collection of libraries, utility functions, enums, and other declarations I find useful to use across mods
 
@@ -76,13 +76,13 @@ return {SuperRegisterMod = function (self, name, path, preferences)
 
     local mod = RegisterMod(name, 1)
 
-    mod.KSIL_VERSION = 3
+    mod.KSIL_VERSION = 4
 
     local AddCallback = mod.AddCallback
     local AddPriorityCallback = mod.AddPriorityCallback
 
     ---@diagnostic disable-next-line: undefined-doc-name
-    ---@param id ModCallbacks | JumpCallback | CustomStatusCallback | SaveManager.Utility.CustomCallback | string | ksil.Callback
+    ---@param id ModCallbacks | JumpCallback | CustomStatusCallback | SaveManager.Utility.CustomCallback | string
     ---@param fn function
     ---@param param any
     function mod:AddCallback(id, fn, param)
@@ -90,7 +90,7 @@ return {SuperRegisterMod = function (self, name, path, preferences)
     end
 
     ---@diagnostic disable-next-line: undefined-doc-name
-    ---@param id ModCallbacks | JumpCallback | CustomStatusCallback | SaveManager.Utility.CustomCallback | string | ksil.Callback
+    ---@param id ModCallbacks | JumpCallback | CustomStatusCallback | SaveManager.Utility.CustomCallback | string
     ---@param priority CallbackPriority | integer
     ---@param fn function
     ---@param param any
@@ -128,7 +128,6 @@ return {SuperRegisterMod = function (self, name, path, preferences)
 
     --#region Declarations
 
-    ---@type {[FamiliarVariant]: true}
     ---@diagnostic disable-next-line: undefined-global
     mod.TEAR_COPYING_FAMILIARS = (JumpLib and JumpLib.Internal.TEAR_COPYING_FAMILIARS) or {
         [FamiliarVariant.INCUBUS] = true,
@@ -139,7 +138,6 @@ return {SuperRegisterMod = function (self, name, path, preferences)
 
     -- mod.TEAR_COPYING_FAMILIARS[FamiliarVariant.SPRINKLER] = true
 
-    ---@type {[EffectVariant]: true}
     mod.CREEP = {
         [EffectVariant.CREEP_RED] = true,
         [EffectVariant.CREEP_GREEN] = true,
@@ -162,7 +160,6 @@ return {SuperRegisterMod = function (self, name, path, preferences)
         [EffectVariant.CREEP_LIQUID_POOP] = true,
     }
 
-    ---@type {[EffectVariant]: true}
     mod.ELLIPSE_CREEP = {
         [EffectVariant.PLAYER_CREEP_HOLYWATER] = true,
         [EffectVariant.PLAYER_CREEP_LEMON_MISHAP] = true,
@@ -170,13 +167,11 @@ return {SuperRegisterMod = function (self, name, path, preferences)
         [EffectVariant.PLAYER_CREEP_PUDDLE_MILK] = true,
     }
 
-    ---@type {[string]: Vector}
     mod.Vector = {
         ZERO = Vector(0, 0),
         ONE = Vector(1, 1),
     }
 
-    ---@type {[string]: Color}
     mod.Color = {
         DEFAULT = Color(1, 1, 1, 1)
     }
@@ -223,7 +218,6 @@ return {SuperRegisterMod = function (self, name, path, preferences)
         TRINKET = 7,
     }
 
-    ---@type {[FamiliarVariant]: true}
     mod.HIVE_MIND_FAMILIARS = {
         [FamiliarVariant.FOREVER_ALONE] = true,
         [FamiliarVariant.DISTANT_ADMIRATION] = true,
@@ -250,16 +244,6 @@ return {SuperRegisterMod = function (self, name, path, preferences)
         [FamiliarVariant.FRUITY_PLUM] = true,
         [FamiliarVariant.SWARM_FLY_ORBITAL] = true,
         [FamiliarVariant.ABYSS_LOCUST] = true,
-    }
-
-    ---@enum ksil.Callback
-    mod.Callback = {
-        POST_LIFT_THROWABLE_ACTIVE = "KSIL_POST_LIFT_THROWABLE_ACTIBE",
-        POST_THROW_THROWABLE_ACTIVE = "KSIL_POST_THROW_THROWABLE_ACTIBE",
-        POST_HIDE_THROWABLE_ACTIVE = "KSIL_POST_HIDE_THROWABLE_ACTIVE",
-        POST_LIFT_THROWABLE_CARD = "KSIL_POST_LIFT_THROWABLE_CARD",
-        POST_THROW_THROWABLE_CARD = "KSIL_POST_THROW_THROWABLE_CARD",
-        POST_HIDE_THROWABLE_CARD = "KSIL_POST_HIDE_THROWABLE_CARD",
     }
 
     mod.ThrowableItemFlag = {
