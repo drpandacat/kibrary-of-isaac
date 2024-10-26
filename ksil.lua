@@ -3,7 +3,7 @@
     Not to be confused with
     Thicco's Standard Isaac Library
 
-    Version 2.0
+    Version 2.0.0.1
 
     Collection of libraries, utility functions, enums, and other declarations I find useful to have across mods
 
@@ -17,7 +17,7 @@
     ConnorForan - Hidden item manager
 ]]
 
-local VERSION = 1
+local VERSION = 1.0001
 
 ---@class ksil.ModConfig
 ---@field JumpLib? boolean
@@ -129,6 +129,10 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
             RUN = 3,
             FLOOR = 4,
             ROOM_FLOOR = 5,
+        }
+
+        ksil.Color = {
+            DEFAULT = Color(1, 1, 1, 1),
         }
 
         ---@param entity Entity
