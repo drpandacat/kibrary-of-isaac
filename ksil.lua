@@ -3,7 +3,7 @@
     Not to be confused with
     Thicco's Standard Isaac Library
 
-    Version 2.0.0.1
+    Version 2.0.1
 
     Collection of libraries, utility functions, enums, and other declarations I find useful to have across mods
 
@@ -17,7 +17,7 @@
     ConnorForan - Hidden item manager
 ]]
 
-local VERSION = 1.0001
+local VERSION = 1.001
 
 ---@class ksil.ModConfig
 ---@field JumpLib? boolean
@@ -481,6 +481,19 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
         return false
     end
 
+    ---@param tbl table
+    ---@param deeperCopy? boolean
+    ---@return table
+    function mod:DeepCopy(tbl, deeperCopy)
+        local copy = {}
+
+        for k, v in pairs(tbl) do
+            copy[k] = deeperCopy and type(v) == "table" and mod:DeepCopy(v, true) or v
+        end
+
+        return copy
+    end
+
     --#endregion
 
     --#region Entity spawning
@@ -721,6 +734,37 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
             data.LastDirection = mod:GetAimDir(player)
             data.LastVector = mod:GetAimVect(player, true)
         end)
+    end
+
+    --#endregion
+
+    --#region Vector
+
+    local DIRECTION_TO_DOOR_OFFSET = {
+        [Direction.UP] = Vector(0, 40),
+        [Direction.RIGHT] = Vector(-40, 0),
+        [Direction.DOWN] = Vector(0, -40),
+        [Direction.LEFT] = Vector(40, 0),
+    }
+
+    ---@param position Vector
+    ---@return boolean
+    function mod:IsPositionAccessible(position)
+        for slot = DoorSlot.LEFT0, DoorSlot.NUM_DOOR_SLOTS - 1 do
+            local door = Game():GetRoom():GetDoor(slot) if door then
+                local npc = mod:SpawnNPC(EntityType.ENTITY_SHOPKEEPER, 0, door.Position + DIRECTION_TO_DOOR_OFFSET[door.Direction])
+                local pathFinder = npc.Pathfinder
+
+                npc.Visible = false
+                npc:Remove()
+
+                if pathFinder:HasPathToPos(position, true) then
+                    return true
+                end
+            end
+        end
+
+        return false
     end
 
     --#endregion
