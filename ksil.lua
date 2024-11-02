@@ -3,7 +3,7 @@
     Not to be confused with
     Thicco's Standard Isaac Library
 
-    Version 2.0.2
+    Version 2.0.3
 
     Collection of libraries, utility functions, enums, and other declarations I find useful to have across mods
 
@@ -17,7 +17,7 @@
     ConnorForan - Hidden item manager
 ]]
 
-local VERSION = 1.002
+local VERSION = 1.003
 
 ---@class ksil.ModConfig
 ---@field JumpLib? boolean
@@ -52,6 +52,12 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
         for k, v in pairs(ksil.Config) do
             if v then
                 ksilConfig[k] = true
+            end
+        end
+
+        for k, v in pairs(ksilConfig) do
+            if v then
+                ksil.Config[k] = true
             end
         end
 
