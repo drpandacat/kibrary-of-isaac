@@ -3,7 +3,7 @@
     Not to be confused with
     Thicco's Standard Isaac Library
 
-    Version 2.0.3
+    Version 2.1
 
     Collection of libraries, utility functions, enums, and other declarations I find useful to have across mods
 
@@ -17,7 +17,7 @@
     ConnorForan - Hidden item manager
 ]]
 
-local VERSION = 1.003
+local VERSION = 1.004
 
 ---@class ksil.ModConfig
 ---@field JumpLib? boolean
@@ -30,18 +30,18 @@ local VERSION = 1.003
 ---@field FloatingTextLib? boolean
 ---@field BleedUtility? boolean
 ---@field LastAimUtility? boolean
+---@field CustomExtraAnimLib? boolean
 
 ---@class ksil.CallbackEntry
 ---@field ID ModCallbacks | string
 ---@field FN function
 ---@field FILTER any
 
----@param self any
 ---@param name any
 ---@param path any
 ---@param ksilConfig ksil.ModConfig
 -- -@return ksil.Mod
-return {SuperRegisterMod = function (self, name, path, ksilConfig)
+return {SuperRegisterMod = function (_, name, path, ksilConfig)
     local meta = RegisterMod("KSIL", 1)
 
     meta.VERSION = VERSION
@@ -1628,6 +1628,99 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
                     end
 
                     textConfig.Font:DrawStringScaled(textConfig.Text, textConfig.Position.X, textConfig.Position.Y, textConfig.Scale, textConfig.Scale, textConfig.Color, 1, true)
+                end
+            end
+        end)
+    end
+
+    if ksilConfig.CustomExtraAnimLib then
+        ---@class ksil.CustomExtraAnimData
+        ---@field Sprite? Sprite
+        ---@field AllowShoot? boolean
+
+        ---@param player EntityPlayer
+        function mod:StopCustomExtraAnim(player)
+            local data = ksil:GetData(player, "CustomExtraAnimation")
+
+            data.Sprite = nil
+            data.AllowShoot = nil
+        end
+
+        ---@param player EntityPlayer
+        ---@return ksil.CustomExtraAnimData
+        function mod:GetCustomExtraAnimData(player)
+            return ksil:GetData(player, "CustomExtraAnimation")
+        end
+
+        ---@param player EntityPlayer
+        ---@param animPath string
+        ---@param animation string
+        ---@param loadSheets? boolean REPENTOGON
+        ---@param allowShoot? boolean
+        function mod:PlayCustomExtraAnim(player, animPath, animation, loadSheets, allowShoot)
+            player:StopExtraAnimation()
+
+            local data = ksil:GetData(player, "CustomExtraAnimation")
+            local sprite = Sprite()
+
+            sprite:Load(animPath, true)
+            sprite:Play(animation, true)
+
+            if loadSheets and REPENTOGON then
+                local pSprite = player:GetSprite()
+
+                for i in ipairs(sprite:GetAllLayers()) do
+                    local _layer = pSprite:GetLayer(i) if not _layer then break end
+                    sprite:ReplaceSpritesheet(i, _layer:GetSpritesheetPath())
+                end
+
+                sprite:LoadGraphics()
+            end
+
+            data.Sprite = sprite
+            data.AllowShoot = allowShoot
+        end
+
+        ---@param player EntityPlayer
+        ---@param offset Vector
+        ksil:AddCallback(ModCallbacks.MC_POST_PLAYER_RENDER, function (_, player, offset)
+            local data = ksil:GetData(player, "CustomExtraAnimation")
+            ---@type Sprite
+            local sprite = data.Sprite if not sprite then return end
+            local color = player.Color
+            sprite.Color = Color(color.R, color.G, color.B, 1, Color.RO, color.GO, color.BO)
+            sprite.Scale = player.SpriteScale
+
+            sprite:Render(Isaac.WorldToScreen(player.Position) + offset)
+        end)
+
+        ---@param player EntityPlayer
+        ksil:AddCallback(ModCallbacks.MC_POST_PEFFECT_UPDATE, function (_, player)
+            local data = ksil:GetData(player, "CustomExtraAnimation")
+
+            if not player:IsExtraAnimationFinished() then
+                data.Sprite = nil
+                data.AllowShoot = nil
+                return
+            end
+
+            ---@type Sprite
+            local sprite = data.Sprite
+
+            if sprite then
+                if sprite:IsFinished() then
+                    data.Sprite = nil
+                    return
+                end
+
+                sprite:Update()
+
+                local color = player.Color
+
+                player:SetColor(Color(color.R, color.G, color.B, 0, color.RO, color.GO, color.BO), 1, 999, false, false)
+
+                if not data.AllowShoot then
+                    player.FireDelay = player.FireDelay + 1
                 end
             end
         end)
