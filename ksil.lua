@@ -3,7 +3,7 @@
     Not to be confused with
     Thicco's Standard Isaac Library
 
-    Version 2.2
+    Version 2.2.0.1
 
     Collection of libraries, utility functions, enums, and other declarations I find useful to have across mods
 
@@ -17,7 +17,7 @@
     ConnorForan - Hidden item manager
 ]]
 
-local VERSION = 1.1
+local VERSION = 1.2
 
 ---@class ksil.ModConfig
 ---@field JumpLib? boolean
@@ -1594,11 +1594,12 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
 
             if mod:ThrowableCardSelected(player) then
                 local card = player:GetCard(0)
+                local config = ThrowableItemConfigs[GetHeldConfigKey(card, ksil.ThrowableItemType.CARD)]
 
                 if q then
-                    if mod:IsItemLifted(player) and data.HeldConfig.Type == ksil.ThrowableItemType.CARD then
+                    if mod:IsItemLifted(player) and config.Type == ksil.ThrowableItemType.CARD then
                         data.ScheduleHide = true
-                    elseif (not data.HeldConfig.HoldCondition or data.HeldConfig.HoldCondition(player, data.HeldConfig)) then
+                    elseif (not config.HoldCondition or config.HoldCondition(player, config)) then
                         mod:LiftItem(player, card, ksil.ThrowableItemType.CARD)
                     end
                 end
@@ -1611,9 +1612,9 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
                     local itemConfig = Isaac.GetItemConfig():GetCard(card)
 
                     if itemConfig:IsRune() and item == CollectibleType.COLLECTIBLE_CLEAR_RUNE or (itemConfig:IsCard() and item == CollectibleType.COLLECTIBLE_BLANK_CARD) then
-                        if mod:IsItemLifted(player) and data.HeldConfig.Type == ksil.ThrowableItemType.CARD then
+                        if mod:IsItemLifted(player) and config.Type == ksil.ThrowableItemType.CARD then
                             data.ScheduleHide = true
-                        elseif (not data.HeldConfig.HoldCondition or data.HeldConfig.HoldCondition(player, data.HeldConfig)) then
+                        elseif (not config.HoldCondition or config.HoldCondition(player, config)) then
                             data.Mimic = item
                             data.ActiveSlot = ActiveSlot.SLOT_PRIMARY
                             mod:LiftItem(player, card, ksil.ThrowableItemType.CARD)
