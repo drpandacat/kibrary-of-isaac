@@ -3,7 +3,7 @@
     Not to be confused with
     Thicco's Standard Isaac Library
 
-    Version 2.0.whoops
+    Version 2.2
 
     Collection of libraries, utility functions, enums, and other declarations I find useful to have across mods
 
@@ -17,7 +17,7 @@
     ConnorForan - Hidden item manager
 ]]
 
-local VERSION = 1.099
+local VERSION = 1.1
 
 ---@class ksil.ModConfig
 ---@field JumpLib? boolean
@@ -86,14 +86,18 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
         if not persistenceMode or persistenceMode == ksil.DataPersistenceMode.TEMP then
             data = entity:GetData()
         else
-            if persistenceMode == ksil.DataPersistenceMode.ROOM then
-                data = ref.SaveManager.GetRoomSave(entity)
-            elseif persistenceMode == ksil.DataPersistenceMode.FLOOR then
-                data = ref.SaveManager.GetFloorSave(entity)
-            elseif persistenceMode == ksil.DataPersistenceMode.ROOM_FLOOR then
-                data = ref.SaveManager.GetRoomFloorSave(entity)
-            else
+            if persistenceMode == ksil.DataPersistenceMode.RUN then
                 data = ref.SaveManager.GetRunSave(entity)
+            elseif persistenceMode == ksil.DataPersistenceMode.ROOM then
+                data = ref.SaveManager.GetRoomSave(entity)
+            elseif persistenceMode == ksil.DataPersistenceMode.FLOOR_REROLL then
+                data = ref.SaveManager.GetFloorSave(entity).RerollSave
+            elseif persistenceMode == ksil.DataPersistenceMode.FLOOR_NO_REROLL then
+                data = ref.SaveManager.GetFloorSave(entity).NoRerollSave
+            elseif persistenceMode == ksil.DataPersistenceMode.ALL_REROLL then
+                data = ref.SaveManager.GetRoomFloorSave(entity).RerollSave
+            elseif persistenceMode == ksil.DataPersistenceMode.NONE_REROLL then
+                data = ref.SaveManager.GetRoomFloorSave(entity).NoRerollSave
             end
         end
 
@@ -132,10 +136,12 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
         ---@enum ksil.DataPersistenceMode
         ksil.DataPersistenceMode = {
             TEMP = 1,
-            ROOM = 2,
-            RUN = 3,
-            FLOOR = 4,
-            ROOM_FLOOR = 5,
+            RUN = 2,
+            ROOM = 3,
+            FLOOR_REROLL = 4,
+            FLOOR_NO_REROLL = 5,
+            ALL_REROLL = 6,
+            NONE_REROLL = 7,
         }
 
         ksil.Color = {
@@ -158,18 +164,16 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
             ALL = 3
         }
 
-        if ksilConfig.BloodTearUtility then
-            ksil.TEAR_TO_BLOOD = {
-                [TearVariant.BLUE] = TearVariant.BLOOD,
-                [TearVariant.CUPID_BLUE] = TearVariant.CUPID_BLOOD,
-                [TearVariant.PUPULA] = TearVariant.PUPULA_BLOOD,
-                [TearVariant.GODS_FLESH] = TearVariant.GODS_FLESH_BLOOD,
-                [TearVariant.NAIL] = TearVariant.NAIL_BLOOD,
-                [TearVariant.GLAUCOMA] = TearVariant.GLAUCOMA_BLOOD,
-                [TearVariant.EYE] = TearVariant.EYE_BLOOD,
-                [TearVariant.KEY] = TearVariant.KEY_BLOOD,
-            }
-        end
+        ksil.TEAR_TO_BLOOD = {
+            [TearVariant.BLUE] = TearVariant.BLOOD,
+            [TearVariant.CUPID_BLUE] = TearVariant.CUPID_BLOOD,
+            [TearVariant.PUPULA] = TearVariant.PUPULA_BLOOD,
+            [TearVariant.GODS_FLESH] = TearVariant.GODS_FLESH_BLOOD,
+            [TearVariant.NAIL] = TearVariant.NAIL_BLOOD,
+            [TearVariant.GLAUCOMA] = TearVariant.GLAUCOMA_BLOOD,
+            [TearVariant.EYE] = TearVariant.EYE_BLOOD,
+            [TearVariant.KEY] = TearVariant.KEY_BLOOD,
+        }
 
         ksil.TEAR_COPYING_FAMILIARS = {
             [FamiliarVariant.INCUBUS] = true,
@@ -291,15 +295,14 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
             [FamiliarVariant.ABYSS_LOCUST] = true,
         }
 
-        if ksilConfig.ThrowableItemLib then
-            ---@class ksil.ThrowableItemConfig
-            ---@field ID CollectibleType | Card
-            ---@field Type ksil.ThrowableItemType
-            ---@field LiftFn? fun(player: EntityPlayer)
-            ---@field HideFn? fun(player: EntityPlayer)
-            ---@field ThrowFn? fun(player: EntityPlayer, vect: Vector)
-            ---@field Flags? ksil.ThrowableItemFlag | integer
+        ---@enum ksil.CardFilterFlags
+        ksil.CardFilterFlags = {
+            INCLUDE_PLAYING_CARDS = 1 << 0,
+            INCLUDE_RUNES = 1 << 1,
+            RUNES_ONLY = 1 << 2,
+        }
 
+        if ksilConfig.ThrowableItemLib then
             ---@enum ksil.ThrowableItemFlag
             ksil.ThrowableItemFlag = {
                 NO_DISCHARGE = 1 << 0,
@@ -307,6 +310,8 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
                 USABLE_ANY_CHARGE = 1 << 2,
                 DISABLE_HIDE = 1 << 3,
                 PERSISTENT = 1 << 4,
+                ---Does not force the item input when throwing an item
+                NO_INPUT_FORCE = 1 << 5,
             }
 
             ---@enum ksil.ThrowableItemType
@@ -328,6 +333,20 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
                 DECREASE = 2,
             }
         end
+
+        ksil.PLAYER_TO_HEALTH_TYPE = {
+            [PlayerType.PLAYER_BLUEBABY] = 1,
+            [PlayerType.PLAYER_THELOST] = 2,
+            [PlayerType.PLAYER_KEEPER] = 3,
+            [PlayerType.PLAYER_JUDAS_B] = 1,
+            [PlayerType.PLAYER_BLACKJUDAS] = 1,
+            [PlayerType.PLAYER_BLUEBABY_B] = 1,
+            [PlayerType.PLAYER_THELOST_B] = 2,
+            [PlayerType.PLAYER_THESOUL] = 1,
+            [PlayerType.PLAYER_THESOUL_B] = 1,
+            [PlayerType.PLAYER_KEEPER_B] = 3,
+            [PlayerType.PLAYER_BETHANY_B] = 1,
+        }
     end
 
     ---@type ksil.CallbackEntry[]
@@ -707,17 +726,17 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
         return mod:GetAimVect(player):Length() > 0.001
     end
 
-    if ksilConfig.LastAimUtility then
-        ---@param player EntityPlayer
-        ---@return Direction
-        function mod:GetAimDir(player)
-            if mod:IsShooting(player) then
-                return mod:VectorToDirection(mod:GetAimVect(player))
-            else
-                return Direction.NO_DIRECTION
-            end
+    ---@param player EntityPlayer
+    ---@return Direction
+    function mod:GetAimDir(player)
+        if mod:IsShooting(player) then
+            return mod:VectorToDirection(mod:GetAimVect(player))
+        else
+            return Direction.NO_DIRECTION
         end
+    end
 
+    if ksilConfig.LastAimUtility then
         ---@param player EntityPlayer
         ---@return Direction
         function mod:GetLastAimDir(player)
@@ -994,7 +1013,7 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
     ---@param pool? ItemPoolType
     ---@param maxTries? integer Increase when using a strict filter
     ---@param seed? integer
-    ---@return CollectibleType
+    ---@return CollectibleType, boolean
     function mod:GetFilteredCollectible(filter, pool, maxTries, seed)
         local rng = RNG()
 
@@ -1004,48 +1023,84 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
         maxTries = maxTries or 200
 
         local collectible = CollectibleType.COLLECTIBLE_BREAKFAST
-        local tries = 0
+        local successful = true
 
         for i = 1, maxTries do
             collectible = Game():GetItemPool():GetCollectible(pool, false, rng:Next())
-            tries = tries + 1
 
-            if filter(Isaac.GetItemConfig():GetCollectible(collectible)) or tries >= maxTries then
+            if filter(Isaac.GetItemConfig():GetCollectible(collectible)) then
                 break
+            end
+
+            if i == maxTries then
+                successful = false
             end
         end
 
         Game():GetItemPool():RemoveCollectible(collectible)
 
-        return collectible
+        return collectible, successful
     end
 
     ---@param filter fun(config: ItemConfigItem): boolean | nil
     ---@param maxTries? integer Increase when using a strict filter
     ---@param seed? integer
-    ---@return TrinketType
+    ---@return TrinketType, boolean
     function mod:GetFilteredTrinket(filter, maxTries, seed)
-        local rng = RNG()
-
-        rng:SetSeed(seed or Game():GetSeeds():GetStartSeed(), 35)
-
         maxTries = maxTries or 100
 
         local trinket = TrinketType.TRINKET_WIGGLE_WORM
-        local tries = 0
+        local successful = true
 
         for i = 1, maxTries do
             trinket = Game():GetItemPool():GetTrinket()
-            tries = tries + 1
 
-            if filter(Isaac.GetItemConfig():GetTrinket(trinket)) or tries >= maxTries then
+            if filter(Isaac.GetItemConfig():GetTrinket(trinket)) then
                 break
+            end
+
+            if i == maxTries then
+                successful = false
             end
         end
 
         Game():GetItemPool():RemoveTrinket(trinket)
 
-        return trinket
+        return trinket, successful
+    end
+
+    ---@param filter fun(config: ItemConfigCard): boolean | nil
+    ---@param maxTries? integer Increase when using a strict filter
+    ---@param seed? integer
+    ---@param flags? ksil.CardFilterFlags | integer
+    ---@return Card, boolean
+    function mod:GetFilteredCard(filter, maxTries, seed, flags)
+        seed = seed or Game():GetSeeds():GetStartSeed()
+        flags = flags or 0
+
+        maxTries = maxTries or 100
+
+        local card = Card.CARD_FOOL
+        local successful = true
+
+        for i = 1, maxTries do
+            card = Game():GetItemPool():GetCard(
+                seed,
+                ksil:HasFlags(flags, ksil.CardFilterFlags.INCLUDE_PLAYING_CARDS),
+                ksil:HasFlags(flags, ksil.CardFilterFlags.INCLUDE_RUNES),
+                ksil:HasFlags(flags, ksil.CardFilterFlags.RUNES_ONLY)
+            )
+
+            if filter(Isaac.GetItemConfig():GetCard(card)) then
+                break
+            end
+
+            if i == maxTries then
+                successful = false
+            end
+        end
+
+        return card, successful
     end
 
     --#endregion
@@ -1328,6 +1383,15 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
     end
 
     if ksilConfig.ThrowableItemLib then
+        ---@class ksil.ThrowableItemConfig
+        ---@field ID CollectibleType | Card
+        ---@field Type ksil.ThrowableItemType
+        ---@field LiftFn? fun(player: EntityPlayer)
+        ---@field HideFn? fun(player: EntityPlayer)
+        ---@field ThrowFn? fun(player: EntityPlayer, vect: Vector)
+        ---@field Flags? ksil.ThrowableItemFlag | integer
+        ---@field HoldCondition? fun(player: EntityPlayer, config: ksil.ThrowableItemConfig): boolean | nil
+
         ---@type ksil.ThrowableItemConfig[]
         local ThrowableItemConfigs = {}
 
@@ -1400,13 +1464,21 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
                 end
             end
 
-            if throw and not mod:HasFlags(data.HeldConfig.Flags, ksil.ThrowableItemFlag.NO_DISCHARGE) then
-                if active and data.ActiveSlot then
-                    player:DischargeActiveItem(data.ActiveSlot)
-                else
-                    CardBehavior()
+            if throw then
+                if not mod:HasFlags(data.HeldConfig.Flags, ksil.ThrowableItemFlag.NO_DISCHARGE) then
+                    if active then
+                        if data.ActiveSlot then
+                            if not mod:HasFlags(data.HeldConfig.Flags, ksil.ThrowableItemFlag.NO_INPUT_FORCE)  then
+                                data.ForceInputSlot = data.ActiveSlot
+                            elseif not mod:HasFlags(data.HeldConfig.Flags, ksil.ThrowableItemFlag.NO_DISCHARGE) then
+                                player:DischargeActiveItem(data.ActiveSlot)
+                            end
+                        end
+                    else
+                        CardBehavior()
+                    end
                 end
-            elseif not throw then
+            else
                 if data.HeldConfig.HideFn then
                     data.HeldConfig.HideFn(player)
                 end
@@ -1461,6 +1533,13 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
             local player = entity and entity:ToPlayer() if not player then return end
 
             if action == ButtonAction.ACTION_ITEM then
+                local data = ksil:GetData(player, "ThrowableItem")
+
+                if data.ForceInputSlot and data.ForceInputSlot == ActiveSlot.SLOT_PRIMARY then
+                    data.ForceInputSlot = false
+                    return true
+                end
+
                 if mod:ThrowableActiveSelected(player) then
                     return false
                 end
@@ -1475,6 +1554,13 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
                     end
                 end
             elseif action == ButtonAction.ACTION_PILLCARD then
+                local data = ksil:GetData(player, "ThrowableItem")
+
+                if data.ForceInputSlot and data.ForceInputSlot == ActiveSlot.SLOT_POCKET then
+                    data.ForceInputSlot = false
+                    return true
+                end
+
                 if mod:ThrowablePocketActiveSelected(player) or mod:ThrowableCardSelected(player) then
                     return false
                 end
@@ -1493,8 +1579,7 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
 
                 if mod:IsItemLifted(player) and data.ActiveSlot == slot then
                     data.ScheduleHide = true
-                elseif player:GetActiveCharge(slot) >= Isaac.GetItemConfig():GetCollectible(item).MaxCharges
-                or mod:HasFlags(ThrowableItemConfigs[GetHeldConfigKey(item, ksil.ThrowableItemType.ACTIVE)].Flags, ksil.ThrowableItemFlag.USABLE_ANY_CHARGE) then
+                elseif (player:GetActiveCharge(slot) >= Isaac.GetItemConfig():GetCollectible(item).MaxCharges or mod:HasFlags(data.HeldConfig.Flags, ksil.ThrowableItemFlag.USABLE_ANY_CHARGE)) and (not data.HeldConfig.HoldCondition or data.HeldConfig.HoldCondition(player, data.HeldConfig)) then
                     mod:LiftItem(player, item, ksil.ThrowableItemType.ACTIVE, slot)
                 end
             end
@@ -1513,7 +1598,7 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
                 if q then
                     if mod:IsItemLifted(player) and data.HeldConfig.Type == ksil.ThrowableItemType.CARD then
                         data.ScheduleHide = true
-                    else
+                    elseif (not data.HeldConfig.HoldCondition or data.HeldConfig.HoldCondition(player, data.HeldConfig)) then
                         mod:LiftItem(player, card, ksil.ThrowableItemType.CARD)
                     end
                 end
@@ -1523,12 +1608,12 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
                 if (player:GetActiveCharge() >= Isaac.GetItemConfig():GetCollectible(item).MaxCharges
                 or mod:HasFlags(ThrowableItemConfigs[GetHeldConfigKey(card, ksil.ThrowableItemType.CARD)].Flags, ksil.ThrowableItemFlag.USABLE_ANY_CHARGE))
                 and Input.IsActionTriggered(ButtonAction.ACTION_ITEM, player.ControllerIndex) then
-                    local config = Isaac.GetItemConfig():GetCard(card)
+                    local itemConfig = Isaac.GetItemConfig():GetCard(card)
 
-                    if config:IsRune() and item == CollectibleType.COLLECTIBLE_CLEAR_RUNE or (config:IsCard() and item == CollectibleType.COLLECTIBLE_BLANK_CARD) then
+                    if itemConfig:IsRune() and item == CollectibleType.COLLECTIBLE_CLEAR_RUNE or (itemConfig:IsCard() and item == CollectibleType.COLLECTIBLE_BLANK_CARD) then
                         if mod:IsItemLifted(player) and data.HeldConfig.Type == ksil.ThrowableItemType.CARD then
                             data.ScheduleHide = true
-                        else
+                        elseif (not data.HeldConfig.HoldCondition or data.HeldConfig.HoldCondition(player, data.HeldConfig)) then
                             data.Mimic = item
                             data.ActiveSlot = ActiveSlot.SLOT_PRIMARY
                             mod:LiftItem(player, card, ksil.ThrowableItemType.CARD)
@@ -1676,7 +1761,9 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
             if loadSheets and REPENTOGON then
                 local pSprite = player:GetSprite()
 
+                ---@diagnostic disable-next-line: undefined-field
                 for i in ipairs(sprite:GetAllLayers()) do
+                    ---@diagnostic disable-next-line: undefined-field
                     local _layer = pSprite:GetLayer(i) if not _layer then break end
                     sprite:ReplaceSpritesheet(i, _layer:GetSpritesheetPath())
                 end
@@ -1732,6 +1819,291 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
             end
         end)
     end
+
+    --#region REPENTOGOFF
+
+    ---@return EntityPlayer[]
+    function mod:GetPlayers()
+        if REPENTOGON then
+            ---@diagnostic disable-next-line: undefined-global
+            return PlayerManager.GetPlayers()
+        end
+
+        local players = {}
+
+        for i = 0, Game():GetNumPlayers() - 1 do
+            table.insert(players, Isaac.GetPlayer(i))
+        end
+
+        return players
+    end
+
+    ---@param id CollectibleType
+    ---@return integer
+    function mod:GetNumCollectibles(id)
+        if REPENTOGON then
+            ---@diagnostic disable-next-line: undefined-global
+            return PlayerManager.GetNumCollectibles(Collidectible)
+        end
+
+        local num = 0
+
+        for _, v in ipairs(mod:GetPlayers()) do
+            num = num + v:GetCollectibleNum(id)
+        end
+
+        return num
+    end
+
+    ---@param id TrinketType
+    ---@return integer
+    function mod:GetTotalTrinketMultiplier(id)
+        if REPENTOGON then
+            ---@diagnostic disable-next-line: undefined-global
+            return PlayerManager.GetTotalTrinketMultiplier(Collidectible)
+        end
+
+        local num = 0
+
+        for _, v in ipairs(mod:GetPlayers()) do
+            num = num + v:GetTrinketMultiplier(id)
+        end
+
+        return num
+    end
+
+    ---@param seed integer
+    ---@return RNG
+    function mod:NewRNG(seed)
+        if REPENTOGON then
+            ---@diagnostic disable-next-line: redundant-parameter
+            return RNG(seed)
+        end
+
+        local rng = RNG()
+
+        rng:SetSeed(seed, 35)
+
+        return rng
+    end
+
+    ---@param rng RNG
+    ---@param min integer
+    ---@param max integer
+    ---@return integer
+    function mod:RandomInt(rng, min, max)
+        if REPENTOGON then
+            ---@diagnostic disable-next-line: redundant-parameter
+            return rng:RandomInt(min, max)
+        end
+
+        return min + rng:RandomInt(max - min + 1)
+    end
+
+    ---@param id CollectibleType
+    ---@return boolean
+    function mod:AnyoneHasCollectible(id)
+        if REPENTOGON then
+            ---@diagnostic disable-next-line: undefined-global
+            return PlayerManager.AnyoneHasCollectible(id)
+        end
+
+        for _, v in ipairs(mod:GetPlayers()) do
+            if v:HasCollectible(id) then
+                return true
+            end
+        end
+
+        return false
+    end
+
+    ---@param id TrinketType
+    ---@return boolean
+    function mod:AnyoneHasTrinket(id)
+        if REPENTOGON then
+            ---@diagnostic disable-next-line: undefined-global
+            return PlayerManager.AnyoneHasTrinket(id)
+        end
+
+        for _, v in ipairs(mod:GetPlayers()) do
+            if v:HasTrinket(id) then
+                return true
+            end
+        end
+
+        return false
+    end
+
+    ---@param id PlayerType
+    ---@return boolean
+    function mod:AnyoneIsPlayerType(id)
+        if REPENTOGON then
+            ---@diagnostic disable-next-line: undefined-global
+            return PlayerManager.AnyoneIsPlayerType(id)
+        end
+
+        for _, v in ipairs(mod:GetPlayers()) do
+            if v:GetPlayerType() == id then
+                return true
+            end
+        end
+
+        return false
+    end
+
+    ---@param playerType PlayerType
+    ---@param collectibleType CollectibleType
+    ---@return boolean
+    function mod:AnyPlayerTypeHasCollectible(playerType, collectibleType)
+        if REPENTOGON then
+            ---@diagnostic disable-next-line: undefined-global
+            return PlayerManager.AnyPlayerTypeHasCollectible(playerType, collectibleType)
+        end
+
+        for _, v in ipairs(mod:GetPlayers()) do
+            if v:GetPlayerType() == playerType and v:HasCollectible(collectibleType) then
+                return true
+            end
+        end
+
+        return false
+    end
+
+    ---@param playerType PlayerType
+    ---@param trinketType TrinketType
+    ---@return boolean
+    function mod:AnyPlayerTypeHasTrinket(playerType, trinketType)
+        if REPENTOGON then
+            ---@diagnostic disable-next-line: undefined-global
+            return PlayerManager.AnyPlayerTypeHasTrinket(playerType, trinketType)
+        end
+
+        for _, v in ipairs(mod:GetPlayers()) do
+            if v:GetPlayerType() == playerType and v:HasTrinket(trinketType) then
+                return true
+            end
+        end
+
+        return false
+    end
+
+    ---@param id CollectibleType
+    ---@return EntityPlayer?
+    function mod:FirstCollectibleOwner(id)
+        if REPENTOGON then
+            ---@diagnostic disable-next-line: undefined-global
+            return PlayerManager.FirstCollectibleOwner(id)
+        end
+
+        for _, v in ipairs(mod:GetPlayers()) do
+            if v:HasCollectible(id) then
+                return v
+            end
+        end
+    end
+
+    ---@param id TrinketType
+    ---@return EntityPlayer?
+    function mod:FirstTrinketOwner(id)
+        if REPENTOGON then
+            ---@diagnostic disable-next-line: undefined-global
+            return PlayerManager.FirstTrinketOwner(id)
+        end
+
+        for _, v in ipairs(mod:GetPlayers()) do
+            if v:HasTrinket(id) then
+                return v
+            end
+        end
+    end
+
+    ---@param id PlayerType
+    ---@return EntityPlayer?
+    function mod:FirstPlayerByType(id)
+        if REPENTOGON then
+            ---@diagnostic disable-next-line: undefined-global
+            return PlayerManager.FirstPlayerByType(id)
+        end
+
+        for _, v in ipairs(mod:GetPlayers()) do
+            if v:GetPlayerType() == id then
+                return v
+            end
+        end
+    end
+
+    ---@param rng RNG
+    ---@return Vector
+    function mod:RandomVector(rng)
+        if REPENTOGON then
+            ---@diagnostic disable-next-line: undefined-field
+            return rng:RandomVector()
+        end
+
+        return Vector(1, 0):Rotated(rng:RandomFloat() * 360)
+    end
+
+    ---@param player EntityPlayer
+    ---@param flags integer
+    function mod:AddCacheFlags(player, flags)
+        if REPENTOGON then
+            ---@diagnostic disable-next-line: redundant-parameter
+            player:AddCacheFlags(flags, true)
+        else
+            player:AddCacheFlags(flags)
+            player:EvaluateItems()
+        end
+    end
+
+    function mod:Picker()
+        local picker = {}
+
+        picker.Outcomes = {}
+
+        ---@param value any
+        ---@param weight number
+        function picker:Add(weight, value)
+            table.insert(picker.Outcomes, {weight, value})
+        end
+
+        ---@param rng RNG
+        function picker:Pick(rng)
+            local totalWeight = 0
+
+            for _, v in ipairs(picker.Outcomes) do
+                totalWeight = totalWeight + v[1]
+            end
+
+            local roll = rng:RandomFloat() * totalWeight
+
+            for _, v in ipairs(picker.Outcomes) do
+                if roll > v[1] then
+                    roll = roll - v[1]
+                else
+                    return v[2]
+                end
+            end
+        end
+
+        function picker:Clear()
+            picker.Outcomes = {}
+        end
+
+        return picker
+    end
+
+    ---@param player EntityPlayer
+    ---@return integer
+    function mod:GetHealthType(player)
+        if REPENTOGON then
+            ---@diagnostic disable-next-line: undefined-field
+            return player:GetHealthType()
+        end
+
+        return ksil.PLAYER_TO_HEALTH_TYPE[player:GetPlayerType()] or 0
+    end
+
+    --#endregion
 
     return mod
 end}
