@@ -3,7 +3,7 @@
     Not to be confused with
     Thicco's Standard Isaac Library
 
-    Version 2.2.0.1
+    Version 2.2.0.2
 
     Collection of libraries, utility functions, enums, and other declarations I find useful to have across mods
 
@@ -17,7 +17,7 @@
     ConnorForan - Hidden item manager
 ]]
 
-local VERSION = 1.2
+local VERSION = 1.21
 
 ---@class ksil.ModConfig
 ---@field JumpLib? boolean
@@ -1576,10 +1576,11 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
 
             local function HandleAction(slot)
                 local item = player:GetActiveItem(slot)
+                local config = ThrowableItemConfigs[GetHeldConfigKey(item, ksil.ThrowableItemType.ACTIVE)]
 
                 if mod:IsItemLifted(player) and data.ActiveSlot == slot then
                     data.ScheduleHide = true
-                elseif (player:GetActiveCharge(slot) >= Isaac.GetItemConfig():GetCollectible(item).MaxCharges or mod:HasFlags(data.HeldConfig.Flags, ksil.ThrowableItemFlag.USABLE_ANY_CHARGE)) and (not data.HeldConfig.HoldCondition or data.HeldConfig.HoldCondition(player, data.HeldConfig)) then
+                elseif (player:GetActiveCharge(slot) >= Isaac.GetItemConfig():GetCollectible(item).MaxCharges or mod:HasFlags(config.Flags, ksil.ThrowableItemFlag.USABLE_ANY_CHARGE)) and (not config.HoldCondition or config.HoldCondition(player, config)) then
                     mod:LiftItem(player, item, ksil.ThrowableItemType.ACTIVE, slot)
                 end
             end
@@ -1957,7 +1958,7 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
     ---@return boolean
     function mod:AnyPlayerTypeHasCollectible(playerType, collectibleType)
         if REPENTOGON then
-            ---@diagnostic disable-next-line: undefined-global
+            ---@diagnostic disable-next-line: undefined-global, return-type-mismatch
             return PlayerManager.AnyPlayerTypeHasCollectible(playerType, collectibleType)
         end
 
@@ -1975,7 +1976,7 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
     ---@return boolean
     function mod:AnyPlayerTypeHasTrinket(playerType, trinketType)
         if REPENTOGON then
-            ---@diagnostic disable-next-line: undefined-global
+            ---@diagnostic disable-next-line: undefined-global, return-type-mismatch
             return PlayerManager.AnyPlayerTypeHasTrinket(playerType, trinketType)
         end
 
