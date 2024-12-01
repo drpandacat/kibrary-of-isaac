@@ -3,7 +3,7 @@
     Not to be confused with
     Thicco's Standard Isaac Library
 
-    Version 2.2.0.2
+    Version 2.2.0.3
 
     Collection of libraries, utility functions, enums, and other declarations I find useful to have across mods
 
@@ -17,7 +17,7 @@
     ConnorForan - Hidden item manager
 ]]
 
-local VERSION = 1.21
+local VERSION = 1.22
 
 ---@class ksil.ModConfig
 ---@field JumpLib? boolean
@@ -310,14 +310,21 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
                 USABLE_ANY_CHARGE = 1 << 2,
                 DISABLE_HIDE = 1 << 3,
                 PERSISTENT = 1 << 4,
-                ---Does not force the item input when throwing an item
-                NO_INPUT_FORCE = 1 << 5,
+                ---Does not activate the item
+                DISABLE_ITEM_USE = 1 << 5,
             }
 
             ---@enum ksil.ThrowableItemType
             ksil.ThrowableItemType = {
                 ACTIVE = 1,
                 CARD = 2,
+            }
+
+            ---@enum ksil.HoldConditionReturnType
+            ksil.HoldConditionReturnType = {
+                DEFAULT_USE = 1,
+                ALLOW_HOLD = 2,
+                DISABLE_USE = 3,
             }
         end
 
@@ -1390,7 +1397,7 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
         ---@field HideFn? fun(player: EntityPlayer)
         ---@field ThrowFn? fun(player: EntityPlayer, vect: Vector)
         ---@field Flags? ksil.ThrowableItemFlag | integer
-        ---@field HoldCondition? fun(player: EntityPlayer, config: ksil.ThrowableItemConfig): boolean | nil
+        ---@field HoldCondition? fun(player: EntityPlayer, config: ksil.ThrowableItemConfig): ksil.HoldConditionReturnType
 
         ---@type ksil.ThrowableItemConfig[]
         local ThrowableItemConfigs = {}
@@ -1456,27 +1463,47 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
                 player:AnimateCard(data.HeldConfig.ID, "HideItem")
             end
 
-            local function CardBehavior()
-                if data.Mimic then
-                    player:DischargeActiveItem()
+            local function ThrowItem(card)
+                data.ActiveSlot = data.ActiveSlot or ActiveSlot.SLOT_PRIMARY
+
+                if mod:HasFlags(data.HeldConfig.Flags, ksil.ThrowableItemFlag.DISABLE_ITEM_USE) then
+                    if not mod:HasFlags(data.HeldConfig.Flags, ksil.ThrowableItemFlag.NO_DISCHARGE) then
+                        player:SetActiveCharge(player:GetActiveCharge(data.ActiveSlot) - Isaac.GetItemConfig():GetCollectible(data.HeldConfig.ID).MaxCharges, data.ActiveSlot)
+                    end
                 else
-                    player:SetCard(0, Card.CARD_NULL)
+                    local item = card and player:GetActiveItem(ActiveSlot.SLOT_PRIMARY) or data.HeldConfig.ID
+
+                    player:UseActiveItem(item)
+
+                    if not mod:HasFlags(data.HeldConfig.Flags, ksil.ThrowableItemFlag.NO_DISCHARGE) then
+                        player:DischargeActiveItem(ActiveSlot.SLOT_PRIMARY)
+                    end
+                end
+            end
+
+            local function ThrowCard()
+                if data.Mimic then
+                    ThrowItem(true)
+                else
+                    if mod:HasFlags(data.HeldConfig.Flags, ksil.ThrowableItemFlag.DISABLE_ITEM_USE) then
+                        if not mod:HasFlags(data.HeldConfig.Flags, ksil.ThrowableItemFlag.NO_DISCHARGE) then
+                            player:SetCard(0, data.HeldConfig.ID)
+                        end
+                    else
+                        if mod:HasFlags(data.HeldConfig.Flags, ksil.ThrowableItemFlag.NO_DISCHARGE) then
+                            player:UseCard(data.HeldConfig.ID)
+                        else
+                            data.ForceInputSlot = ActiveSlot.SLOT_POCKET
+                        end
+                    end
                 end
             end
 
             if throw then
-                if not mod:HasFlags(data.HeldConfig.Flags, ksil.ThrowableItemFlag.NO_DISCHARGE) then
-                    if active then
-                        if data.ActiveSlot then
-                            if not mod:HasFlags(data.HeldConfig.Flags, ksil.ThrowableItemFlag.NO_INPUT_FORCE)  then
-                                data.ForceInputSlot = data.ActiveSlot
-                            elseif not mod:HasFlags(data.HeldConfig.Flags, ksil.ThrowableItemFlag.NO_DISCHARGE) then
-                                player:DischargeActiveItem(data.ActiveSlot)
-                            end
-                        end
-                    else
-                        CardBehavior()
-                    end
+                if active then
+                    ThrowItem()
+                else
+                    ThrowCard()
                 end
             else
                 if data.HeldConfig.HideFn then
@@ -1485,9 +1512,9 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
 
                 if mod:HasFlags(data.HeldConfig.Flags, ksil.ThrowableItemFlag.DISCHARGE_HIDE) then
                     if active then
-                        player:DischargeActiveItem(data.ActiveSlot)
+                        ThrowItem()
                     else
-                        CardBehavior()
+                        ThrowCard()
                     end
                 end
             end
@@ -1503,28 +1530,38 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
         end
 
         ---@param player EntityPlayer
-        ---@return boolean
-        function mod:ThrowableActiveSelected(player)
-            return not not ThrowableItemConfigs[GetHeldConfigKey(player:GetActiveItem(ActiveSlot.SLOT_PRIMARY), ksil.ThrowableItemType.ACTIVE)]
+        ---@return ksil.ThrowableItemConfig?
+        function mod:GetThrowableActiveConfig(player)
+            return ThrowableItemConfigs[GetHeldConfigKey(player:GetActiveItem(ActiveSlot.SLOT_PRIMARY), ksil.ThrowableItemType.ACTIVE)]
         end
 
         ---@param player EntityPlayer
-        ---@return boolean
-        function mod:ThrowableCardSelected(player)
-            return not not ThrowableItemConfigs[GetHeldConfigKey(player:GetCard(0), ksil.ThrowableItemType.CARD)]
+        ---@return ksil.ThrowableItemConfig?
+        function mod:GetThrowableCardConfig(player)
+            return ThrowableItemConfigs[GetHeldConfigKey(player:GetCard(0), ksil.ThrowableItemType.CARD)]
         end
 
         ---@param player EntityPlayer
-        ---@return boolean
-        function mod:ThrowablePocketActiveSelected(player)
-            if player:GetCard(0) ~= Card.CARD_NULL then return false end
-            return not not ThrowableItemConfigs[GetHeldConfigKey(player:GetActiveItem(ActiveSlot.SLOT_POCKET), ksil.ThrowableItemType.ACTIVE)]
+        ---@return ksil.ThrowableItemConfig?
+        function mod:GetThrowablePocketConfig(player)
+            if player:GetCard(0) ~= Card.CARD_NULL then return end
+            return ThrowableItemConfigs[GetHeldConfigKey(player:GetActiveItem(ActiveSlot.SLOT_POCKET), ksil.ThrowableItemType.ACTIVE)]
         end
 
         ---@param config ksil.ThrowableItemConfig
         function mod:RegisterThrowableItem(config)
             config.Flags = config.Flags or 0
             ThrowableItemConfigs[GetHeldConfigKey(config.ID, config.Type)] = config
+        end
+
+        ---@param player EntityPlayer
+        ---@param config ksil.ThrowableItemConfig
+        ---@return ksil.HoldConditionReturnType?
+        function mod:ShouldLiftThrowableItem(player, config)
+            if config.HoldCondition then
+                return config.HoldCondition(player, config)
+            end
+            return ksil.HoldConditionReturnType.ALLOW_HOLD
         end
 
         ---@param entity Entity?
@@ -1535,33 +1572,52 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
             if action == ButtonAction.ACTION_ITEM then
                 local data = ksil:GetData(player, "ThrowableItem")
 
-                if data.ForceInputSlot and data.ForceInputSlot == ActiveSlot.SLOT_PRIMARY then
+                if data.ForceInputSlot == ActiveSlot.SLOT_PRIMARY then
                     data.ForceInputSlot = false
                     return true
                 end
 
-                if mod:ThrowableActiveSelected(player) then
+                local active = mod:GetThrowableActiveConfig(player)
+
+                if active then
+                    if mod:ShouldLiftThrowableItem(player, active) == ksil.HoldConditionReturnType.DEFAULT_USE then return end
                     return false
                 end
 
-                if mod:ThrowableCardSelected(player) then
+                if mod:GetThrowableCardConfig(player) then
                     local card = player:GetCard(0)
                     local config = Isaac.GetItemConfig():GetCard(card)
                     local item = player:GetActiveItem(ActiveSlot.SLOT_PRIMARY)
 
-                    if (config:IsRune() and item == CollectibleType.COLLECTIBLE_CLEAR_RUNE) or (config:IsCard() and item == CollectibleType.COLLECTIBLE_BLANK_CARD) then
-                        return false
+                    if (config:IsRune() and item == CollectibleType.COLLECTIBLE_CLEAR_RUNE) or
+                    (config:IsCard() and item == CollectibleType.COLLECTIBLE_BLANK_CARD) then
+                        local cardThrowConfig = mod:GetThrowableCardConfig(player)
+
+                        if cardThrowConfig then
+                            if mod:ShouldLiftThrowableItem(player, cardThrowConfig) == ksil.HoldConditionReturnType.DEFAULT_USE then return end
+                            return false
+                        end
                     end
                 end
             elseif action == ButtonAction.ACTION_PILLCARD then
                 local data = ksil:GetData(player, "ThrowableItem")
 
-                if data.ForceInputSlot and data.ForceInputSlot == ActiveSlot.SLOT_POCKET then
+                if data.ForceInputSlot == ActiveSlot.SLOT_POCKET then
                     data.ForceInputSlot = false
                     return true
                 end
 
-                if mod:ThrowablePocketActiveSelected(player) or mod:ThrowableCardSelected(player) then
+                local card = mod:GetThrowableCardConfig(player)
+
+                if card then
+                    if mod:ShouldLiftThrowableItem(player, card) == ksil.HoldConditionReturnType.DEFAULT_USE then return end
+                    return false
+                end
+
+                local pocket = mod:GetThrowablePocketConfig(player)
+
+                if pocket then
+                    if mod:ShouldLiftThrowableItem(player, pocket) == ksil.HoldConditionReturnType.DEFAULT_USE then return end
                     return false
                 end
             elseif action == ButtonAction.ACTION_DROP and mod:IsItemLifted(player) then
@@ -1574,33 +1630,39 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
             local q = Input.IsActionTriggered(ButtonAction.ACTION_PILLCARD, player.ControllerIndex)
             local data = ksil:GetData(player, "ThrowableItem")
 
-            local function HandleAction(slot)
+            ---@param slot ActiveSlot
+            ---@param config ksil.ThrowableItemConfig
+            local function HandleAction(slot, config)
                 local item = player:GetActiveItem(slot)
-                local config = ThrowableItemConfigs[GetHeldConfigKey(item, ksil.ThrowableItemType.ACTIVE)]
 
                 if mod:IsItemLifted(player) and data.ActiveSlot == slot then
                     data.ScheduleHide = true
-                elseif (player:GetActiveCharge(slot) >= Isaac.GetItemConfig():GetCollectible(item).MaxCharges or mod:HasFlags(config.Flags, ksil.ThrowableItemFlag.USABLE_ANY_CHARGE)) and (not config.HoldCondition or config.HoldCondition(player, config)) then
+                elseif (player:GetActiveCharge(slot) >= Isaac.GetItemConfig():GetCollectible(item).MaxCharges or mod:HasFlags(config.Flags, ksil.ThrowableItemFlag.USABLE_ANY_CHARGE)) and mod:ShouldLiftThrowableItem(player, config) == ksil.HoldConditionReturnType.ALLOW_HOLD then
                     mod:LiftItem(player, item, ksil.ThrowableItemType.ACTIVE, slot)
                 end
             end
 
-            if mod:ThrowableActiveSelected(player) and Input.IsActionTriggered(ButtonAction.ACTION_ITEM, player.ControllerIndex) then
-                HandleAction(ActiveSlot.SLOT_PRIMARY)
+            local active = mod:GetThrowableActiveConfig(player)
+
+            if active and Input.IsActionTriggered(ButtonAction.ACTION_ITEM, player.ControllerIndex) then
+                HandleAction(ActiveSlot.SLOT_PRIMARY, active)
             end
 
-            if mod:ThrowablePocketActiveSelected(player) and q then
-                HandleAction(ActiveSlot.SLOT_POCKET)
+            local pocket = mod:GetThrowablePocketConfig(player)
+
+            if pocket and q then
+                HandleAction(ActiveSlot.SLOT_POCKET, pocket)
             end
 
-            if mod:ThrowableCardSelected(player) then
+            local config = mod:GetThrowableCardConfig(player)
+
+            if config then
                 local card = player:GetCard(0)
-                local config = ThrowableItemConfigs[GetHeldConfigKey(card, ksil.ThrowableItemType.CARD)]
 
                 if q then
                     if mod:IsItemLifted(player) and config.Type == ksil.ThrowableItemType.CARD then
                         data.ScheduleHide = true
-                    elseif (not config.HoldCondition or config.HoldCondition(player, config)) then
+                    elseif mod:ShouldLiftThrowableItem(player, config) == ksil.HoldConditionReturnType.ALLOW_HOLD then
                         mod:LiftItem(player, card, ksil.ThrowableItemType.CARD)
                     end
                 end
@@ -1608,17 +1670,20 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
                 local item = player:GetActiveItem(ActiveSlot.SLOT_PRIMARY)
 
                 if (player:GetActiveCharge() >= Isaac.GetItemConfig():GetCollectible(item).MaxCharges
-                or mod:HasFlags(ThrowableItemConfigs[GetHeldConfigKey(card, ksil.ThrowableItemType.CARD)].Flags, ksil.ThrowableItemFlag.USABLE_ANY_CHARGE))
+                or mod:HasFlags(config.Flags, ksil.ThrowableItemFlag.USABLE_ANY_CHARGE))
                 and Input.IsActionTriggered(ButtonAction.ACTION_ITEM, player.ControllerIndex) then
                     local itemConfig = Isaac.GetItemConfig():GetCard(card)
 
                     if itemConfig:IsRune() and item == CollectibleType.COLLECTIBLE_CLEAR_RUNE or (itemConfig:IsCard() and item == CollectibleType.COLLECTIBLE_BLANK_CARD) then
                         if mod:IsItemLifted(player) and config.Type == ksil.ThrowableItemType.CARD then
                             data.ScheduleHide = true
-                        elseif (not config.HoldCondition or config.HoldCondition(player, config)) then
+                        else
                             data.Mimic = item
                             data.ActiveSlot = ActiveSlot.SLOT_PRIMARY
-                            mod:LiftItem(player, card, ksil.ThrowableItemType.CARD)
+
+                            if mod:ShouldLiftThrowableItem(player, config) == ksil.HoldConditionReturnType.ALLOW_HOLD then
+                                mod:LiftItem(player, card, ksil.ThrowableItemType.CARD)
+                            end
                         end
                     end
                 end
