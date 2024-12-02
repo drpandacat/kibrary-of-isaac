@@ -3,7 +3,7 @@
     Not to be confused with
     Thicco's Standard Isaac Library
 
-    Version 2.2.0.3
+    Version 2.2.1
 
     Collection of libraries, utility functions, enums, and other declarations I find useful to have across mods
 
@@ -17,7 +17,7 @@
     ConnorForan - Hidden item manager
 ]]
 
-local VERSION = 1.22
+local VERSION = 1.23
 
 ---@class ksil.ModConfig
 ---@field JumpLib? boolean
@@ -31,6 +31,7 @@ local VERSION = 1.22
 ---@field BleedUtility? boolean
 ---@field LastAimUtility? boolean
 ---@field CustomExtraAnimLib? boolean
+---@field TrueSpawner? boolean
 
 ---@class ksil.CallbackEntry
 ---@field ID ModCallbacks | string
@@ -527,7 +528,59 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
         return copy
     end
 
+    ---@param tbl table
+    ---@param filter fun(a: any): boolean | nil
+    function mod:Filter(tbl, filter)
+        local _tbl = {}
+
+        for _, v in pairs(tbl) do
+            if filter(v) then
+                table.insert(_tbl, v)
+            end
+        end
+
+        return _tbl
+    end
+
     --#endregion
+
+    if ksilConfig.TrueSpawner then
+
+        ---@param entity Entity
+        ---@return Entity?
+        function mod:GetTrueSpawnerEntity(entity)
+            local data = ksil:GetData(entity, "GetTrueSpawnerEntity")
+            return data.SpawnerEntity or entity.SpawnerEntity or entity.Parent
+        end
+
+        ---@param tear EntityTear
+        ksil:AddPriorityCallback(ModCallbacks.MC_POST_TEAR_INIT, CallbackPriority.IMPORTANT, function (_, tear)
+            local data = ksil:GetData(tear, "GetTrueSpawnerEntity")
+
+            for _, v in ipairs(Isaac.FindByType(EntityType.ENTITY_FAMILIAR)) do
+                local dist = v.Position:Distance(tear.Position - tear.Velocity)
+
+                if dist < 0.01 then
+                    data.SpawnerEntity = v
+                    break
+                end
+            end
+        end)
+
+        ---@param bomb EntityBomb
+        ksil:AddPriorityCallback(ModCallbacks.MC_POST_BOMB_INIT, CallbackPriority.IMPORTANT, function (_, bomb)
+            local data = ksil:GetData(bomb, "GetTrueSpawnerEntity")
+
+            for _, v in ipairs(Isaac.FindByType(EntityType.ENTITY_FAMILIAR)) do
+                local dist = v.Position:Distance(bomb.Position)
+
+                if dist < 0.01 then
+                    data.SpawnerEntity = v
+                    break
+                end
+            end
+        end)
+    end
 
     --#region Entity spawning
 
@@ -653,6 +706,19 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
         return Game():Spawn(EntityType.ENTITY_SLOT, variant, position, velocity or ksil.Vector.ZERO, spawner or nil, subtype or 0, seed or math.max(Random(), 1))
     end
 
+    ---@param variant integer
+    ---@param position Vector
+    ---@param velocity? Vector
+    ---@param subtype? integer
+    ---@param spawner? Entity
+    ---@param seed? integer
+    ---@diagnostic disable-next-line: undefined-doc-name
+    ---@return EntitySlot
+    function mod:SpawnSlotEx(variant, position, velocity, spawner, subtype, seed)
+        ---@diagnostic disable-next-line: return-type-mismatch, undefined-field
+        return Game():Spawn(EntityType.ENTITY_SLOT, variant, position, velocity or ksil.Vector.ZERO, spawner or nil, subtype or 0, seed or math.max(Random(), 1)):ToSlot()
+    end
+
     --#endregion
 
     --#region Players
@@ -743,6 +809,39 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
         end
     end
 
+    ---@param player EntityPlayer
+    ---@param disableClamp? boolean
+    function mod:GetDynamicAimVect(player, disableClamp)
+        local aim = player:GetAimDirection()
+        local returnVect = Vector(aim.X, aim.Y)
+
+        if not disableClamp then
+            if returnVect:Length() > 0.001 then
+                if not player:HasCollectible(CollectibleType.COLLECTIBLE_MARKED) and not player:HasCollectible(CollectibleType.COLLECTIBLE_ANALOG_STICK) then
+                    returnVect = mod:CardinalClamp(returnVect)
+                end
+            end
+        end
+
+        return returnVect
+    end
+
+    ---@param player EntityPlayer
+    ---@return boolean
+    function mod:IsShootingDynamic(player)
+        return mod:GetDynamicAimVect(player):Length() > 0.001
+    end
+
+     ---@param player EntityPlayer
+    ---@return Direction
+    function mod:GetDynamicAimDir(player)
+        if mod:IsShootingDynamic(player) then
+            return mod:VectorToDirection(mod:GetDynamicAimVect(player))
+        else
+            return Direction.NO_DIRECTION
+        end
+    end
+
     if ksilConfig.LastAimUtility then
         ---@param player EntityPlayer
         ---@return Direction
@@ -759,6 +858,20 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
         end
 
         ---@param player EntityPlayer
+        ---@return Direction
+        function mod:GetLastDynamicAimDir(player)
+            return ksil:GetData(player, "Aiming").LastDirectionDynamic or Direction.NO_DIRECTION
+        end
+
+        ---@param player EntityPlayer
+        ---@param disableClamp? boolean
+        ---@return Vector
+        function mod:GetLastDynamicAimVect(player, disableClamp)
+            local vect = ksil:GetData(player, "Aiming").LastVectorDynamic
+            return (not vect and ksil.Vector.Zero) or (not disableClamp and mod:CardinalClamp(vect)) or vect
+        end
+
+        ---@param player EntityPlayer
         ksil:AddCallback(ModCallbacks.MC_POST_PLAYER_UPDATE, function (_, player)
             if not mod:IsShooting(player) then return end
 
@@ -766,6 +879,8 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
 
             data.LastDirection = mod:GetAimDir(player)
             data.LastVector = mod:GetAimVect(player, true)
+            data.LastDirectionDynamic = mod:GetDynamicAimDir(player)
+            data.LastVectorDynamic = mod:GetDynamicAimVect(player, true)
         end)
     end
 
@@ -788,6 +903,7 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
                 local npc = mod:SpawnNPC(EntityType.ENTITY_SHOPKEEPER, 0, door.Position + DIRECTION_TO_DOOR_OFFSET[door.Direction])
                 local pathFinder = npc.Pathfinder
 
+                npc:AddEntityFlags(EntityFlag.FLAG_NO_QUERY)
                 npc.Visible = false
                 npc:Remove()
 
@@ -860,29 +976,14 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
     --#region Entity filtering
 
     ---@param list Entity[]
-    ---@param filter fun(entity: Entity): boolean | nil
-    ---@return Entity[]
-    function mod:GetFilteredEntities(list, filter)
-        local _list = {}
-
-        for _, v in pairs(list) do
-            if filter(v) then
-                table.insert(_list, v)
-            end
-        end
-
-        return _list
-    end
-
-    ---@param list Entity[]
     ---@param pos Vector
-    ---@param filter? fun(entity: Entity): (boolean?)
+    ---@param filter? fun(entity: Entity): boolean?
     ---@param source? Entity
     ---@return Entity[]
     function mod:EntitiesByDistance(list, pos, filter, source)
         local _list = {}
 
-        list = filter and mod:GetFilteredEntities(list, filter) or list
+        list = filter and mod:Filter(list, filter) or list
 
         if source then
             local hash = GetPtrHash(source)
