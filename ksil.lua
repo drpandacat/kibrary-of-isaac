@@ -3,7 +3,7 @@
     Not to be confused with
     Thicco's Standard Isaac Library
 
-    Version 2.2.1
+    Version 2.2.2
 
     Collection of libraries, utility functions, enums, and other declarations I find useful to have across mods
 
@@ -17,7 +17,7 @@
     ConnorForan - Hidden item manager
 ]]
 
-local VERSION = 1.23
+local VERSION = 1.24
 
 ---@class ksil.ModConfig
 ---@field JumpLib? boolean
@@ -1289,6 +1289,14 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
         local HiddenItemManager = _include("hiddenitemmanager")
         HiddenItemManager:Init(mod)
         mod.HiddenItemManager = HiddenItemManager
+
+        mod:AddCallback(ModCallbacks.MC_PRE_GAME_EXIT, function ()
+            mod.HiddenItemData = mod.HiddenItemManager:GetSaveData()
+        end)
+
+        mod:AddCallback(ModCallbacks.MC_POST_GAME_STARTED, function ()
+            mod.HiddenItemManager:LoadData(mod.HiddenItemData)
+        end)
     end
 
     if ksilConfig.JumpLib then
