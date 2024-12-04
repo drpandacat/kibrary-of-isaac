@@ -3,7 +3,7 @@
     Not to be confused with
     Thicco's Standard Isaac Library
 
-    Version 2.2.2
+    Version 2.2.2.1
 
     Collection of libraries, utility functions, enums, and other declarations I find useful to have across mods
 
@@ -17,7 +17,7 @@
     ConnorForan - Hidden item manager
 ]]
 
-local VERSION = 1.24
+local VERSION = 1.25
 
 ---@class ksil.ModConfig
 ---@field JumpLib? boolean
@@ -1596,7 +1596,7 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
                 else
                     if mod:HasFlags(data.HeldConfig.Flags, ksil.ThrowableItemFlag.DISABLE_ITEM_USE) then
                         if not mod:HasFlags(data.HeldConfig.Flags, ksil.ThrowableItemFlag.NO_DISCHARGE) then
-                            player:SetCard(0, data.HeldConfig.ID)
+                            player:SetCard(0, 0)
                         end
                     else
                         if mod:HasFlags(data.HeldConfig.Flags, ksil.ThrowableItemFlag.NO_DISCHARGE) then
