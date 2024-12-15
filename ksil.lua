@@ -3,7 +3,7 @@
     Not to be confused with
     Thicco's Standard Isaac Library
 
-    Version 2.2.3
+    Version 2.2.4
 
     Collection of libraries, utility functions, enums, and other declarations I find useful to have across mods
 
@@ -17,7 +17,7 @@
     ConnorForan - Hidden item manager
 ]]
 
-local VERSION = 1.26
+local VERSION = 1.27
 
 ---@class ksil.ModConfig
 ---@field JumpLib? boolean
@@ -909,7 +909,7 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
                 mult = 0.5
             end
         else
-            if familiar.Variant == FamiliarVariant.INCUBUS or familiar.Variant == FamiliarVariant.UMBILICAL_BABY then
+            if familiar.Variant == FamiliarVariant.INCUBUS or familiar.Variant == FamiliarVariant.UMBILICAL_BABY or familiar.Variant == FamiliarVariant.CAINS_OTHER_EYE then
                 mult = 0.75
             elseif familiar.Variant == FamiliarVariant.TWISTED_BABY then
                 mult = 0.375
