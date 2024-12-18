@@ -3,7 +3,7 @@
     Not to be confused with
     Thicco's Standard Isaac Library
 
-    Version 2.2.4
+    Version 2.2.5
 
     Collection of libraries, utility functions, enums, and other declarations I find useful to have across mods
 
@@ -17,7 +17,7 @@
     ConnorForan - Hidden item manager
 ]]
 
-local VERSION = 1.27
+local VERSION = 1.28
 
 ---@class ksil.ModConfig
 ---@field JumpLib? boolean
@@ -45,6 +45,8 @@ local VERSION = 1.27
 -- -@return ksil.Mod
 return {SuperRegisterMod = function (self, name, path, ksilConfig)
     local meta = RegisterMod("KSIL", 1)
+    -- -@class ksil.Mod
+    local mod = RegisterMod(name, 1)
 
     meta.VERSION = VERSION
 
@@ -329,13 +331,148 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
             [PlayerType.PLAYER_KEEPER_B] = 3,
             [PlayerType.PLAYER_BETHANY_B] = 1,
         }
+
+        ksil.LIVING_GRID_CONDITIONS = {
+            ---@param grid GridEntity
+            [GridEntityType.GRID_ROCK] = function (grid)
+                return grid.State ~= 2
+            end,
+            ---@param grid GridEntity
+            [GridEntityType.GRID_ROCKT] = function (grid)
+                return grid.State ~= 2
+            end,
+            ---@param grid GridEntity
+            [GridEntityType.GRID_ROCK_BOMB] = function (grid)
+                return grid.State ~= 2
+            end,
+            ---@param grid GridEntity
+            [GridEntityType.GRID_ROCK_ALT] = function (grid)
+                return grid.State ~= 2
+            end,
+            ---@param grid GridEntity
+            [GridEntityType.GRID_LOCK] = function (grid)
+                return grid.State ~= 1
+            end,
+            ---@param grid GridEntity
+            [GridEntityType.GRID_TNT] = function (grid)
+                return grid.State ~= 4
+            end,
+            ---@param grid GridEntity
+            [GridEntityType.GRID_POOP] = function (grid)
+                return grid.State ~= 1000
+            end,
+            ---@param grid GridEntity
+            [GridEntityType.GRID_DOOR] = function (grid)
+                return not grid:ToDoor():IsOpen()
+            end,
+            ---@param grid GridEntity
+            [GridEntityType.GRID_ROCK_SS] = function (grid)
+                return grid.State ~= 2
+            end,
+            ---@param grid GridEntity
+            [GridEntityType.GRID_ROCK_SPIKED] = function (grid)
+                return grid.State ~= 2
+            end,
+            ---@param grid GridEntity
+            [GridEntityType.GRID_ROCK_ALT2] = function (grid)
+                return grid.State ~= 2
+            end,
+            ---@param grid GridEntity
+            [GridEntityType.GRID_ROCK_GOLD] = function (grid)
+                return grid.State ~= 2
+            end,
+            [GridEntityType.GRID_PILLAR] = function ()
+                return true
+            end,
+            [GridEntityType.GRID_ROCKB] = function ()
+                return true
+            end,
+            [GridEntityType.GRID_WALL] = function ()
+                return true
+            end
+        }
+
+        ksil.EXPLODABLE_GRID_CONDITIONS = {
+            ---@param grid GridEntity
+            [GridEntityType.GRID_ROCK] = function (grid)
+                return grid.State ~= 2
+            end,
+            ---@param grid GridEntity
+            [GridEntityType.GRID_ROCKT] = function (grid)
+                return grid.State ~= 2
+            end,
+            ---@param grid GridEntity
+            [GridEntityType.GRID_ROCK_BOMB] = function (grid)
+                return grid.State ~= 2
+            end,
+            ---@param grid GridEntity
+            [GridEntityType.GRID_ROCK_ALT] = function (grid)
+                return grid.State ~= 2
+            end,
+            ---@param grid GridEntity
+            [GridEntityType.GRID_LOCK] = function (grid)
+                return grid.State ~= 1 and mod:AnyoneHasTrinket(TrinketType.TRINKET_BROKEN_PADLOCK)
+            end,
+            ---@param grid GridEntity
+            [GridEntityType.GRID_TNT] = function (grid)
+                return grid.State ~= 4
+            end,
+            ---@param grid GridEntity
+            [GridEntityType.GRID_POOP] = function (grid)
+                return grid.State ~= 1000
+            end,
+            ---@param grid GridEntity
+            [GridEntityType.GRID_DOOR] = function (grid)
+                if Game():GetLevel():GetStage() >= LevelStage.STAGE6 and not mod:AnyoneHasCollectible(CollectibleType.COLLECTIBLE_MERCURIUS) then
+                    if not Game():GetRoom():IsClear() then
+                        return false
+                    end
+                end
+
+                local door = grid:ToDoor() ---@cast door GridEntityDoor
+                local variant = door:GetVariant()
+
+                if variant == DoorVariant.DOOR_UNLOCKED then
+                    return not door:IsOpen()
+                elseif variant == DoorVariant.DOOR_HIDDEN then
+                    return not door:IsOpen()
+                elseif variant == DoorVariant.DOOR_LOCKED_GREED then
+                    return false
+                elseif variant == DoorVariant.DOOR_LOCKED_KEYFAMILIAR then
+                    return false
+                elseif variant == DoorVariant.DOOR_LOCKED_BARRED then
+                    return false
+                elseif variant == DoorVariant.DOOR_LOCKED_CRACKED then
+                    return not (not door:IsLocked() and door:IsOpen())
+                elseif variant == DoorVariant.DOOR_LOCKED_DOUBLE then
+                    return mod:AnyoneHasTrinket(TrinketType.TRINKET_BROKEN_PADLOCK) and (not (not door:IsLocked() and door:IsOpen()))
+                elseif variant == DoorVariant.DOOR_LOCKED then
+                    return mod:AnyoneHasTrinket(TrinketType.TRINKET_BROKEN_PADLOCK) and (not (not door:IsLocked() and door:IsOpen()))
+                else
+                    return not door:IsOpen()
+                end
+            end,
+            ---@param grid GridEntity
+            [GridEntityType.GRID_ROCK_SS] = function (grid)
+                return grid.State ~= 2
+            end,
+            ---@param grid GridEntity
+            [GridEntityType.GRID_ROCK_SPIKED] = function (grid)
+                return grid.State ~= 2
+            end,
+            ---@param grid GridEntity
+            [GridEntityType.GRID_ROCK_ALT2] = function (grid)
+                return grid.State ~= 2
+            end,
+            ---@param grid GridEntity
+            [GridEntityType.GRID_ROCK_GOLD] = function (grid)
+                return grid.State ~= 2
+            end,
+        }
     end
 
     ---@type ksil.CallbackEntry[]
     ksil.CallbackEntries = {}
-
-    -- -@class ksil.Mod
-    local mod = RegisterMod(name, 1)
 
     mod.KSIL_VERSION = VERSION
 
@@ -1924,6 +2061,32 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
         end
 
         return ksil.PLAYER_TO_HEALTH_TYPE[player:GetPlayerType()] or 0
+    end
+
+    --#endregion
+
+    --#region Grid
+
+    ---@param grid GridEntity
+    function mod:CanDestroyByExplosion(grid)
+        local type = grid:GetType()
+
+        if ksil.EXPLODABLE_GRID_CONDITIONS[type] then
+            return ksil.EXPLODABLE_GRID_CONDITIONS[type](grid)
+        end
+
+        return false
+    end
+
+    ---@param grid GridEntity
+    function mod:IsActiveGrid(grid)
+        local type = grid:GetType()
+
+        if ksil.LIVING_GRID_CONDITIONS[type] then
+            return ksil.LIVING_GRID_CONDITIONS[type](grid)
+        end
+
+        return false
     end
 
     --#endregion
