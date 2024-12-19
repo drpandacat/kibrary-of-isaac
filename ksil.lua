@@ -3,7 +3,7 @@
     Not to be confused with
     Thicco's Standard Isaac Library
 
-    Version 2.2.6
+    Version 2.2.7
 
     Collection of libraries, utility functions, enums, and other declarations I find useful to have across mods
 
@@ -17,7 +17,7 @@
     ConnorForan - Hidden item manager
 ]]
 
-local VERSION = 1.29
+local VERSION = 1.3
 
 ---@class ksil.ModConfig
 ---@field JumpLib? boolean
@@ -1685,11 +1685,19 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
         ---@field AllowShoot? boolean
 
         ---@param player EntityPlayer
+        local function SetColor(player)
+            local color = player.Color
+            player:SetColor(Color(color.R, color.G, color.B, 0, color.RO, color.GO, color.BO), 1, 999, false, false)
+        end
+
+        ---@param player EntityPlayer
         function mod:StopCustomExtraAnim(player)
             local data = ksil:GetData(player, "CustomExtraAnimation")
 
             data.Sprite = nil
             data.AllowShoot = nil
+
+            SetColor(player)
         end
 
         ---@param player EntityPlayer
@@ -1729,7 +1737,7 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
             data.AllowShoot = allowShoot
         end
 
-        ksil:AddCallback(ModCallbacks.MC_PRE_PLAYER_RENDER, function (_, player)
+        ksil:AddCallback(ModCallbacks.MC_POST_PLAYER_RENDER, function (_, player)
             local data = ksil:GetData(player, "CustomExtraAnimation")
             ---@type Sprite
             local sprite = data.Sprite if not sprite then return end
@@ -1746,16 +1754,17 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
 
             sprite:Render(finalPos)
 
-            return false
+            -- return false
         end)
 
         ---@param player EntityPlayer
         ksil:AddCallback(ModCallbacks.MC_POST_PEFFECT_UPDATE, function (_, player)
             local data = ksil:GetData(player, "CustomExtraAnimation")
 
-            if not player:IsExtraAnimationFinished() then
+            if not player:IsExtraAnimationFinished() and data.Sprite then
                 data.Sprite = nil
                 data.AllowShoot = nil
+                SetColor(player)
                 return
             end
 
@@ -1769,6 +1778,8 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
                 end
 
                 sprite:Update()
+
+                SetColor(player)
 
                 if not data.AllowShoot then
                     player.FireDelay = player.FireDelay + 1
