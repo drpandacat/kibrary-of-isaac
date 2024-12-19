@@ -3,7 +3,7 @@
     Not to be confused with
     Thicco's Standard Isaac Library
 
-    Version 2.2.5
+    Version 2.2.6
 
     Collection of libraries, utility functions, enums, and other declarations I find useful to have across mods
 
@@ -17,7 +17,7 @@
     ConnorForan - Hidden item manager
 ]]
 
-local VERSION = 1.28
+local VERSION = 1.29
 
 ---@class ksil.ModConfig
 ---@field JumpLib? boolean
@@ -1693,12 +1693,6 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
         end
 
         ---@param player EntityPlayer
-        local function SetColor(player)
-            local color = player.Color
-            player:SetColor(Color(color.R, color.G, color.B, 0, color.RO, color.GO, color.BO), 1, 999, false, false)
-        end
-
-        ---@param player EntityPlayer
         ---@return ksil.CustomExtraAnimData
         function mod:GetCustomExtraAnimData(player)
             return ksil:GetData(player, "CustomExtraAnimation")
@@ -1733,13 +1727,9 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
 
             data.Sprite = sprite
             data.AllowShoot = allowShoot
-
-            SetColor(player)
         end
 
-        ---@param player EntityPlayer
-        ---@param offset Vector
-        ksil:AddCallback(ModCallbacks.MC_POST_PLAYER_RENDER, function (_, player, offset)
+        ksil:AddCallback(ModCallbacks.MC_PRE_PLAYER_RENDER, function (_, player)
             local data = ksil:GetData(player, "CustomExtraAnimation")
             ---@type Sprite
             local sprite = data.Sprite if not sprite then return end
@@ -1747,7 +1737,16 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
             sprite.Color = Color(color.R, color.G, color.B, 1, Color.RO, color.GO, color.BO)
             sprite.Scale = player.SpriteScale
 
-            sprite:Render(Isaac.WorldToScreen(player.Position))
+
+            local finalPos = Isaac.WorldToScreen(player.Position)
+
+            if JumpLib then
+                finalPos = finalPos + JumpLib:GetOffset(player)
+            end
+
+            sprite:Render(finalPos)
+
+            return false
         end)
 
         ---@param player EntityPlayer
@@ -1770,8 +1769,6 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
                 end
 
                 sprite:Update()
-
-                SetColor(player)
 
                 if not data.AllowShoot then
                     player.FireDelay = player.FireDelay + 1
