@@ -3,7 +3,7 @@
     Not to be confused with
     Thicco's Standard Isaac Library
 
-    Version 2.2.7
+    Version 2.2.8
 
     Collection of libraries, utility functions, enums, and other declarations I find useful to have across mods
 
@@ -17,7 +17,7 @@
     ConnorForan - Hidden item manager
 ]]
 
-local VERSION = 1.3
+local VERSION = 1.4
 
 ---@class ksil.ModConfig
 ---@field JumpLib? boolean
@@ -1479,7 +1479,7 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
         ksil:AddCallback(ModCallbacks.MC_POST_NEW_ROOM, function ()
             for i, v in pairs(ksil.FunctionScheduleEntries) do
                 if v.Type ~= ksil.FunctionScheduleType.PERSISTENT then
-                    if v.Type == ksil.FunctionScheduleType.POST_LEAVE_ROOM_EXECUTE or (not REPENTOGON and (v.Type == ksil.FunctionScheduleType.PRE_LEAVE_ROOM_EXECUTE)) then
+                    if v.Type ~= ksil.FunctionScheduleType.LEAVE_ROOM_CANCEL and (v.Type == ksil.FunctionScheduleType.POST_LEAVE_ROOM_EXECUTE or (not REPENTOGON and (v.Type == ksil.FunctionScheduleType.PRE_LEAVE_ROOM_EXECUTE))) then
                         v.Fn()
                     end
                     table.remove(ksil.FunctionScheduleEntries, i)
@@ -1741,6 +1741,9 @@ return {SuperRegisterMod = function (self, name, path, ksilConfig)
             local data = ksil:GetData(player, "CustomExtraAnimation")
             ---@type Sprite
             local sprite = data.Sprite if not sprite then return end
+
+            SetColor(player)
+
             local color = player.Color
             sprite.Color = Color(color.R, color.G, color.B, 1, Color.RO, color.GO, color.BO)
             sprite.Scale = player.SpriteScale
